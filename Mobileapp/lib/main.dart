@@ -11,9 +11,9 @@ void main() async {
   // Initialize SharedPreferences
   final prefs = await SharedPreferences.getInstance();
 
-  // Initialize Notifications Service
+  // Initialize Notifications Service asynchronously to not block the first frame
   final notificationService = NotificationService.instance;
-  await notificationService.init();
+  notificationService.init(); // Fire and forget
 
   runApp(
     ProviderScope(

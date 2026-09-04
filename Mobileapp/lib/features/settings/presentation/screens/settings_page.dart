@@ -8,6 +8,9 @@ import '../../../../app/app.dart';
 import '../../providers/settings_provider.dart';
 import '../../../reminders/presentation/providers/reminder_list_provider.dart';
 
+import 'package:path/path.dart' as p;
+import 'ringtone_selection_screen.dart';
+
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
@@ -110,13 +113,49 @@ class SettingsPage extends ConsumerWidget {
           ),
 
           _SettingsSection(
-            title: 'Notifications',
+            title: 'Alarm & Notifications',
             children: [
               _SettingsSwitch(
-                title: 'Vibrate on Alarm',
+                title: 'Enable Notifications',
+                subtitle: 'Allow app to send notifications',
+                icon: Icons.notifications_active_outlined,
+                value: settings.notificationsEnabled,
+                onChanged: (val) => ref.read(settingsNotifierProvider.notifier).setNotificationsEnabled(val),
+              ),
+              _SettingsSwitch(
+                title: '5-Minute Warning',
+                subtitle: 'Notify 5 minutes before scheduled time',
+                icon: Icons.timer_outlined,
+                value: settings.fiveMinuteWarningEnabled,
+                onChanged: (val) => ref.read(settingsNotifierProvider.notifier).setFiveMinuteWarningEnabled(val),
+              ),
+              _SettingsSwitch(
+                title: 'Alarm Sound',
+                subtitle: 'Play sound when alarm triggers',
+                icon: Icons.volume_up_outlined,
+                value: settings.alarmSoundEnabled,
+                onChanged: (val) => ref.read(settingsNotifierProvider.notifier).setAlarmSoundEnabled(val),
+              ),
+              _SettingsTile(
+                title: 'Ringtone',
+                subtitle: _formatRingtoneName(settings.defaultRingtone),
+                icon: Icons.music_note_outlined,
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RingtoneSelectionScreen(),
+                    ),
+                  );
+                },
+              ),
+              _SettingsSwitch(
+                title: 'Alarm Vibration',
+                subtitle: 'Vibrate when alarm triggers',
                 icon: Icons.vibration,
-                value: settings.vibrateOnAlarm,
-                onChanged: (val) => ref.read(settingsNotifierProvider.notifier).setVibrateOnAlarm(val),
+                value: settings.alarmVibrationEnabled,
+                onChanged: (val) => ref.read(settingsNotifierProvider.notifier).setAlarmVibrationEnabled(val),
               ),
               _SettingsTile(
                 title: 'Default Snooze Duration',
@@ -203,6 +242,14 @@ class SettingsPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String _formatRingtoneName(String ringtoneId) {
+    if (ringtoneId == 'morning_alarm') return 'Morning Alarm';
+    if (ringtoneId == 'classic_alarm') return 'Classic Alarm';
+    if (ringtoneId == 'digital_alarm') return 'Digital Alarm';
+    if (ringtoneId == 'gentle_alarm') return 'Gentle Alarm';
+    return p.basename(ringtoneId);
   }
 
   Widget _buildProfileCard(ThemeData theme, bool isDarkMode) {

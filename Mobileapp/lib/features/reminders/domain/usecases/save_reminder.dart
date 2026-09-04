@@ -11,25 +11,18 @@ class SaveReminderUseCase {
   Future<void> call(Reminder reminder) async {
     await repository.saveReminder(reminder);
 
+    await notificationService.cancelNotification(reminder.id);
+
     if (!reminder.isCompleted && reminder.scheduledAt.isAfter(DateTime.now())) {
       if (reminder.isRepeating && reminder.repeatType != RepeatType.none) {
         await notificationService.scheduleRepeatingNotification(
-          id: reminder.id,
-          title: reminder.title,
-          body: reminder.description ?? 'You have a reminder!',
-          scheduledDate: reminder.scheduledAt,
-          repeatType: reminder.repeatType.name,
+          reminder: reminder,
         );
       } else {
         await notificationService.scheduleNotification(
-          id: reminder.id,
-          title: reminder.title,
-          body: reminder.description ?? 'You have a reminder!',
-          scheduledDate: reminder.scheduledAt,
+          reminder: reminder,
         );
       }
-    } else {
-      await notificationService.cancelNotification(reminder.id);
     }
   }
 }

@@ -19,18 +19,11 @@ class ToggleCompletionUseCase {
         if (reminder.scheduledAt.isAfter(DateTime.now())) {
           if (reminder.isRepeating && reminder.repeatType != RepeatType.none) {
             await notificationService.scheduleRepeatingNotification(
-              id: reminder.id,
-              title: reminder.title,
-              body: reminder.description ?? 'You have a reminder!',
-              scheduledDate: reminder.scheduledAt,
-              repeatType: reminder.repeatType.name,
+              reminder: reminder,
             );
           } else {
             await notificationService.scheduleNotification(
-              id: reminder.id,
-              title: reminder.title,
-              body: reminder.description ?? 'You have a reminder!',
-              scheduledDate: reminder.scheduledAt,
+              reminder: reminder,
             );
           }
         }

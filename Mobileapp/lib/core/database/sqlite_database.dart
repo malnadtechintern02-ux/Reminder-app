@@ -21,7 +21,7 @@ class SqliteDatabase {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onConfigure: _onConfigure,
@@ -38,6 +38,12 @@ class SqliteDatabase {
       await db.execute('ALTER TABLE reminders ADD COLUMN alarm_sound_enabled INTEGER NOT NULL DEFAULT 1 CHECK (alarm_sound_enabled IN (0, 1))');
       await db.execute('ALTER TABLE reminders ADD COLUMN alarm_vibration_enabled INTEGER NOT NULL DEFAULT 1 CHECK (alarm_vibration_enabled IN (0, 1))');
       await db.execute('ALTER TABLE reminders ADD COLUMN snooze_minutes INTEGER NOT NULL DEFAULT 5');
+    }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE reminders ADD COLUMN warning_enabled INTEGER NOT NULL DEFAULT 1 CHECK (warning_enabled IN (0, 1))');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE reminders ADD COLUMN ringtone TEXT');
     }
   }
 
@@ -74,6 +80,8 @@ class SqliteDatabase {
         alarm_sound_enabled INTEGER NOT NULL DEFAULT 1 CHECK (alarm_sound_enabled IN (0, 1)),
         alarm_vibration_enabled INTEGER NOT NULL DEFAULT 1 CHECK (alarm_vibration_enabled IN (0, 1)),
         snooze_minutes INTEGER NOT NULL DEFAULT 5,
+        warning_enabled INTEGER NOT NULL DEFAULT 1 CHECK (warning_enabled IN (0, 1)),
+        ringtone TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
       )

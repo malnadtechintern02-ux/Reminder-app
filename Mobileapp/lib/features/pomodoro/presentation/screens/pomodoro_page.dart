@@ -106,53 +106,55 @@ class _PomodoroPageState extends ConsumerState<PomodoroPage> {
         title: const Text('🍅 Pomodoro'),
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              isBreak ? 'BREAK' : 'FOCUS',
-              style: const TextStyle(
-                fontSize: 25,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 30),
-            Text(
-              time,
-              style: const TextStyle(
-                fontSize: 80,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  iconSize: 40,
-                  onPressed: reset,
-                  icon: const Icon(
-                    Icons.refresh,
-                  ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                isBreak ? 'BREAK' : 'FOCUS',
+                style: const TextStyle(
+                  fontSize: 25,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(width: 20),
-                FloatingActionButton.large(
-                  onPressed: running ? pause : start,
-                  child: Icon(
-                    running ? Icons.pause : Icons.play_arrow,
-                    size: 40,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-            Text(
-              isBreak ? 'Take a short break ☕' : 'Focus on your task 🎯',
-              style: const TextStyle(
-                fontSize: 17,
               ),
-            ),
-          ],
+              const SizedBox(height: 30),
+              Text(
+                time,
+                style: const TextStyle(
+                  fontSize: 80,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 40),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    iconSize: 40,
+                    onPressed: reset,
+                    icon: const Icon(
+                      Icons.refresh,
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  FloatingActionButton.large(
+                    onPressed: running ? pause : start,
+                    child: Icon(
+                      running ? Icons.pause : Icons.play_arrow,
+                      size: 40,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 30),
+              Text(
+                isBreak ? 'Take a short break ☕' : 'Focus on your task 🎯',
+                style: const TextStyle(
+                  fontSize: 17,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -22,6 +22,7 @@ void main() {
       alarmSoundEnabled: true,
       alarmVibrationEnabled: true,
       snoozeMinutes: 5,
+      warningEnabled: true,
       createdAt: creationDate,
     );
 
@@ -43,6 +44,7 @@ void main() {
       expect(map['alarm_sound_enabled'], 1);
       expect(map['alarm_vibration_enabled'], 1);
       expect(map['snooze_minutes'], 5);
+      expect(map['warning_enabled'], 1);
       expect(map['created_at'], creationDate.toIso8601String());
     });
 
@@ -62,6 +64,7 @@ void main() {
         'alarm_sound_enabled': 1,
         'alarm_vibration_enabled': 1,
         'snooze_minutes': 5,
+        'warning_enabled': 1,
         'created_at': creationDate.toIso8601String(),
       };
 
@@ -81,6 +84,7 @@ void main() {
       expect(model.alarmSoundEnabled, true);
       expect(model.alarmVibrationEnabled, true);
       expect(model.snoozeMinutes, 5);
+      expect(model.warningEnabled, true);
       expect(model.createdAt, creationDate);
     });
   });

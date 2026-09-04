@@ -17,6 +17,8 @@ class ReminderModel extends Reminder {
     required super.alarmSoundEnabled,
     required super.alarmVibrationEnabled,
     required super.snoozeMinutes,
+    required super.warningEnabled,
+    super.ringtone,
     required super.createdAt,
   });
 
@@ -37,6 +39,8 @@ class ReminderModel extends Reminder {
       alarmSoundEnabled: map['alarm_sound_enabled'] == null || (map['alarm_sound_enabled'] as int) == 1,
       alarmVibrationEnabled: map['alarm_vibration_enabled'] == null || (map['alarm_vibration_enabled'] as int) == 1,
       snoozeMinutes: map['snooze_minutes'] as int? ?? 5,
+      warningEnabled: map['warning_enabled'] == null || (map['warning_enabled'] as int) == 1,
+      ringtone: map['ringtone'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -58,6 +62,8 @@ class ReminderModel extends Reminder {
       'alarm_sound_enabled': alarmSoundEnabled ? 1 : 0,
       'alarm_vibration_enabled': alarmVibrationEnabled ? 1 : 0,
       'snooze_minutes': snoozeMinutes,
+      'warning_enabled': warningEnabled ? 1 : 0,
+      'ringtone': ringtone,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -79,6 +85,8 @@ class ReminderModel extends Reminder {
       alarmSoundEnabled: entity.alarmSoundEnabled,
       alarmVibrationEnabled: entity.alarmVibrationEnabled,
       snoozeMinutes: entity.snoozeMinutes,
+      warningEnabled: entity.warningEnabled,
+      ringtone: entity.ringtone,
       createdAt: entity.createdAt,
     );
   }

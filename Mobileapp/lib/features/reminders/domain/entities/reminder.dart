@@ -41,6 +41,8 @@ class Reminder {
   final bool alarmSoundEnabled;
   final bool alarmVibrationEnabled;
   final int snoozeMinutes;
+  final bool warningEnabled;
+  final String? ringtone;
   final DateTime createdAt;
 
   const Reminder({
@@ -59,6 +61,8 @@ class Reminder {
     required this.alarmSoundEnabled,
     required this.alarmVibrationEnabled,
     required this.snoozeMinutes,
+    required this.warningEnabled,
+    this.ringtone,
     required this.createdAt,
   });
 
@@ -78,6 +82,8 @@ class Reminder {
     bool? alarmSoundEnabled,
     bool? alarmVibrationEnabled,
     int? snoozeMinutes,
+    bool? warningEnabled,
+    String? ringtone,
     DateTime? createdAt,
   }) {
     return Reminder(
@@ -96,6 +102,8 @@ class Reminder {
       alarmSoundEnabled: alarmSoundEnabled ?? this.alarmSoundEnabled,
       alarmVibrationEnabled: alarmVibrationEnabled ?? this.alarmVibrationEnabled,
       snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
+      warningEnabled: warningEnabled ?? this.warningEnabled,
+      ringtone: ringtone ?? this.ringtone,
       createdAt: createdAt ?? this.createdAt,
     );
   }

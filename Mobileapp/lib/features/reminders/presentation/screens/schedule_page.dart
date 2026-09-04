@@ -173,23 +173,15 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Date Navigator
-          _buildDateNavigator(theme),
-          
-          // Progress Card
-          _buildProgressCard(theme, totalTasks, completedTasks, pendingTasks, progress),
-          
-          const SizedBox(height: 8),
-
-          // Timeline
-          Expanded(
-            child: totalTasks == 0
-                ? _buildEmptyState(theme)
-                : _buildTimeline(theme, dayReminders, categoriesAsync),
-          ),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverToBoxAdapter(child: _buildDateNavigator(theme)),
+          SliverToBoxAdapter(child: _buildProgressCard(theme, totalTasks, completedTasks, pendingTasks, progress)),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
         ],
+        body: totalTasks == 0
+            ? _buildEmptyState(theme)
+            : _buildTimeline(theme, dayReminders, categoriesAsync),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.pushNamed(RouteNames.createReminder),

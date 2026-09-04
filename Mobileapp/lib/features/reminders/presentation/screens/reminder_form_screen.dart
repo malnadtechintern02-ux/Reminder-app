@@ -36,6 +36,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
   bool _isRepeating = false;
   RepeatType _repeatType = RepeatType.none;
   bool _hasAlarm = true; // Maps to basic notifications
+  bool _warningEnabled = true;
   bool _alarmEnabled = false;
   bool _alarmSoundEnabled = true;
   bool _alarmVibrationEnabled = true;
@@ -71,6 +72,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
           _isRepeating = reminder.isRepeating;
           _repeatType = reminder.repeatType;
           _hasAlarm = reminder.hasAlarm;
+          _warningEnabled = reminder.warningEnabled;
           _alarmEnabled = reminder.alarmEnabled;
           _alarmSoundEnabled = reminder.alarmSoundEnabled;
           _alarmVibrationEnabled = reminder.alarmVibrationEnabled;
@@ -89,7 +91,12 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
         
         final settings = ref.read(settingsNotifierProvider);
         setState(() {
-          _hasAlarm = settings.vibrateOnAlarm;
+          _hasAlarm = settings.notificationsEnabled;
+          _warningEnabled = settings.fiveMinuteWarningEnabled;
+          _alarmEnabled = settings.vibrateOnAlarm || settings.alarmSoundEnabled;
+          _alarmSoundEnabled = settings.alarmSoundEnabled;
+          _alarmVibrationEnabled = settings.alarmVibrationEnabled;
+          _snoozeMinutes = settings.defaultSnoozeDuration;
         });
       }
     });
@@ -199,6 +206,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
       isRepeating: _isRepeating,
       repeatType: _isRepeating ? _repeatType : RepeatType.none,
       hasAlarm: _hasAlarm,
+      warningEnabled: _warningEnabled,
       alarmEnabled: _alarmEnabled,
       alarmSoundEnabled: _alarmSoundEnabled,
       alarmVibrationEnabled: _alarmVibrationEnabled,
@@ -416,6 +424,17 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                 color: theme.cardColor,
                 child: Column(
                   children: [
+                    SwitchListTile(
+                      title: const Text('5-Minute Warning', style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Notify me 5 mins before'),
+                      value: _warningEnabled,
+                      onChanged: (val) {
+                        setState(() {
+                          _warningEnabled = val;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1),
                     SwitchListTile(
                       title: const Text('Full-Screen Alarm', style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text('Wake device & ring loudly'),

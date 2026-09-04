@@ -123,20 +123,51 @@ class ReminderListNotifier extends StateNotifier<ReminderListState> {
   }
 
   Future<void> saveReminder(Reminder reminder) async {
+    // Optimistic update
+    final previousReminders = state.reminders;
+    final index = previousReminders.indexWhere((r) => r.id == reminder.id);
+    final updatedReminders = List<Reminder>.from(previousReminders);
+    if (index >= 0) {
+      updatedReminders[index] = reminder;
+    } else {
+      updatedReminders.add(reminder);
+    }
+    
+    // Sort reminders to maintain order
+    updatedReminders.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    
+    state = state.copyWith(reminders: updatedReminders);
+
     try {
       await _saveReminder(reminder);
-      await loadReminders();
+      // Run sync in the background
+      _syncToServer(state.reminders);
     } catch (e) {
-      state = state.copyWith(errorMessage: e.toString());
+      print('Reminder save failed: $e');
+      state = state.copyWith(
+        reminders: previousReminders,
+        errorMessage: e.toString(),
+      );
     }
   }
 
   Future<void> deleteReminder(String id) async {
+    // Optimistic UI update
+    final previousReminders = state.reminders;
+    state = state.copyWith(reminders: previousReminders.where((r) => r.id != id).toList());
+
     try {
       await _deleteReminder(id);
-      await loadReminders();
+      // We don't await loadReminders() to avoid blocking UI with a full refresh + sync
+      // Run sync in the background
+      _syncToServer(state.reminders);
     } catch (e) {
-      state = state.copyWith(errorMessage: e.toString());
+      // Rollback on error
+      print('Reminder delete failed: $e');
+      state = state.copyWith(
+        reminders: previousReminders,
+        errorMessage: e.toString(),
+      );
     }
   }
 
