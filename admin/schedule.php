@@ -52,6 +52,7 @@ $schedules = $pdo->query($query)->fetchAll();
             <a href="priorities.php">Priorities</a>
             <a href="pomodoro.php">Pomodoro</a>
             <a href="notifications.php">Notifications</a>
+            <a href="ringtones.php">Ringtones</a>
             <a href="pages.php">Pages</a>
             <a href="faqs.php">FAQs</a>
             <a href="settings.php">Settings</a>

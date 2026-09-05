@@ -5,6 +5,8 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../../features/reminders/domain/entities/reminder.dart';
+import '../../features/settings/providers/settings_provider.dart';
+
 
 @pragma('vm:entry-point')
 void notificationTapBackground(fln.NotificationResponse notificationResponse) {
@@ -248,51 +250,81 @@ class NotificationService {
 
   Future<fln.NotificationDetails> _getAlarmNotificationDetails(Reminder reminder) async {
     final prefs = await SharedPreferences.getInstance();
-    final defaultRingtone = prefs.getString('defaultRingtone') ?? 'morning_alarm';
-    final ringtoneId = reminder.ringtone ?? defaultRingtone;
+    final globalRingtone = prefs.getString('defaultRingtone') ?? 'morning_alarm';
+    final ringtoneId = (reminder.ringtone != null && reminder.ringtone!.isNotEmpty)
+        ? reminder.ringtone!
+        : globalRingtone;
     
-    // Create the channel dynamically
     final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
         fln.AndroidFlutterLocalNotificationsPlugin>();
         
     String channelId = 'alarm_channel_v2';
     
-    if (androidPlugin != null && reminder.alarmSoundEnabled) {
-      // Is built-in or custom?
-      final isBuiltIn = ['morning_alarm', 'classic_alarm', 'digital_alarm', 'gentle_alarm'].contains(ringtoneId);
-      
-      if (isBuiltIn) {
-        channelId = 'alarm_channel_$ringtoneId';
+    if (androidPlugin != null) {
+      if (!reminder.alarmSoundEnabled) {
+        channelId = 'alarm_channel_silent';
         await androidPlugin.createNotificationChannel(
           fln.AndroidNotificationChannel(
             channelId,
-            'Alarm: $ringtoneId',
-            description: 'Exact time reminder alarm with custom sound',
+            'Silent Alarms',
+            description: 'Alarms without sound',
             importance: fln.Importance.max,
-            playSound: true,
+            playSound: false,
             enableVibration: reminder.alarmVibrationEnabled,
-            sound: fln.RawResourceAndroidNotificationSound(ringtoneId),
           ),
         );
       } else {
-        // Custom URI sound
-        final hash = ringtoneId.hashCode;
-        channelId = 'alarm_channel_custom_$hash';
-        // Need to check if file exists
-        if (File(ringtoneId).existsSync()) {
+        final isBuiltIn = builtInRingtones.any((r) => r.id == ringtoneId);
+        
+        if (isBuiltIn) {
+          channelId = 'alarm_channel_$ringtoneId';
+          final ringtoneObj = builtInRingtones.firstWhere(
+            (r) => r.id == ringtoneId,
+            orElse: () => BuiltInRingtone(id: ringtoneId, name: ringtoneId),
+          );
           await androidPlugin.createNotificationChannel(
             fln.AndroidNotificationChannel(
               channelId,
-              'Alarm: Custom Sound',
-              description: 'Exact time reminder alarm with custom sound',
+              'Alarm Sound (${ringtoneObj.name})',
+              description: 'Exact time reminder alarm with ${ringtoneObj.name}',
               importance: fln.Importance.max,
               playSound: true,
               enableVibration: reminder.alarmVibrationEnabled,
-              sound: fln.UriAndroidNotificationSound('file://$ringtoneId'),
+              sound: fln.RawResourceAndroidNotificationSound(ringtoneId),
             ),
           );
         } else {
-           channelId = 'alarm_channel_v2'; // fallback to default
+          final customFile = File(ringtoneId);
+          if (customFile.existsSync()) {
+            final hash = ringtoneId.hashCode.abs();
+            channelId = 'alarm_channel_custom_$hash';
+            await androidPlugin.createNotificationChannel(
+              fln.AndroidNotificationChannel(
+                channelId,
+                'Custom Alarm Sound',
+                description: 'Exact time reminder alarm with custom sound',
+                importance: fln.Importance.max,
+                playSound: true,
+                enableVibration: reminder.alarmVibrationEnabled,
+                sound: fln.UriAndroidNotificationSound('file://$ringtoneId'),
+              ),
+            );
+          } else {
+            // Fallback to default morning_breeze channel if custom file is missing
+            channelId = 'alarm_channel_morning_breeze';
+            await androidPlugin.createNotificationChannel(
+              fln.AndroidNotificationChannel(
+                channelId,
+                'Alarm Sound (Morning Breeze)',
+                description: 'Exact time reminder alarm with Morning Breeze sound',
+                importance: fln.Importance.max,
+                playSound: true,
+                sound: const fln.RawResourceAndroidNotificationSound('morning_breeze'),
+              ),
+            );
+
+
+          }
         }
       }
     }
@@ -325,10 +357,11 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: reminder.alarmSoundEnabled,
-        sound: ringtoneId.endsWith('.wav') || ringtoneId.endsWith('.mp3') ? ringtoneId : '$ringtoneId.wav',
+        sound: ringtoneId.endsWith('.wav') || ringtoneId.endsWith('.mp3') ? ringtoneId : '$ringtoneId.mp3',
       ),
     );
   }
+
 
   Future<void> showPomodoroFinished() async {
     const details = fln.NotificationDetails(

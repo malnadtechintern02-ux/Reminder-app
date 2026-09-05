@@ -68,6 +68,7 @@ $priorities = $pdo->query("SELECT * FROM priorities ORDER BY level ASC")->fetchA
             <a href="priorities.php" class="active">Priorities</a>
             <a href="pomodoro.php">Pomodoro</a>
             <a href="notifications.php">Notifications</a>
+            <a href="ringtones.php">Ringtones</a>
             <a href="pages.php">Pages</a>
             <a href="faqs.php">FAQs</a>
             <a href="settings.php">Settings</a>

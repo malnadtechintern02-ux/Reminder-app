@@ -8,6 +8,29 @@ final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
   return await PackageInfo.fromPlatform();
 });
 
+class BuiltInRingtone {
+  final String id;
+  final String name;
+
+  const BuiltInRingtone({required this.id, required this.name});
+}
+
+const List<BuiltInRingtone> builtInRingtones = [
+  BuiltInRingtone(id: 'morning_breeze', name: 'Morning Breeze'),
+  BuiltInRingtone(id: 'soft_sunrise', name: 'Soft Sunrise'),
+  BuiltInRingtone(id: 'bright_morning', name: 'Bright Morning'),
+  BuiltInRingtone(id: 'gentle_wake', name: 'Gentle Wake'),
+  BuiltInRingtone(id: 'happy_start', name: 'Happy Start'),
+  BuiltInRingtone(id: 'fresh_day', name: 'Fresh Day'),
+  BuiltInRingtone(id: 'digital_pulse', name: 'Digital Pulse'),
+  BuiltInRingtone(id: 'calm_bell', name: 'Calm Bell'),
+  BuiltInRingtone(id: 'energy_wake', name: 'Energy Wake'),
+  BuiltInRingtone(id: 'daily_beat', name: 'Daily Beat'),
+  BuiltInRingtone(id: 'focus_start', name: 'Focus Start'),
+  BuiltInRingtone(id: 'classic_modern', name: 'Classic Modern'),
+];
+
+
 class SettingsState {
   final int defaultSnoozeDuration;
   final bool vibrateOnAlarm;
@@ -43,7 +66,7 @@ class SettingsState {
     this.fiveMinuteWarningEnabled = true,
     this.alarmSoundEnabled = true,
     this.alarmVibrationEnabled = true,
-    this.defaultRingtone = 'morning_alarm',
+    this.defaultRingtone = 'morning_breeze',
     this.customRingtones = const [],
   });
 
@@ -106,7 +129,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       fiveMinuteWarningEnabled: _prefs.getBool('fiveMinuteWarningEnabled') ?? true,
       alarmSoundEnabled: _prefs.getBool('alarmSoundEnabled') ?? true,
       alarmVibrationEnabled: _prefs.getBool('alarmVibrationEnabled') ?? true,
-      defaultRingtone: _prefs.getString('defaultRingtone') ?? 'morning_alarm',
+      defaultRingtone: _prefs.getString('defaultRingtone') ?? 'morning_breeze',
       customRingtones: _prefs.getStringList('customRingtones') ?? [],
     );
   }
@@ -195,7 +218,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     state = state.copyWith(customRingtones: updated);
     await _prefs.setStringList('customRingtones', updated);
     if (state.defaultRingtone == path) {
-      await setDefaultRingtone('morning_alarm');
+      await setDefaultRingtone('morning_breeze');
     }
   }
 }

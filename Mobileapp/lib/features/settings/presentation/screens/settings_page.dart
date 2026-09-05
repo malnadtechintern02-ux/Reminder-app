@@ -245,12 +245,12 @@ class SettingsPage extends ConsumerWidget {
   }
 
   String _formatRingtoneName(String ringtoneId) {
-    if (ringtoneId == 'morning_alarm') return 'Morning Alarm';
-    if (ringtoneId == 'classic_alarm') return 'Classic Alarm';
-    if (ringtoneId == 'digital_alarm') return 'Digital Alarm';
-    if (ringtoneId == 'gentle_alarm') return 'Gentle Alarm';
+    for (final r in builtInRingtones) {
+      if (r.id == ringtoneId) return r.name;
+    }
     return p.basename(ringtoneId);
   }
+
 
   Widget _buildProfileCard(ThemeData theme, bool isDarkMode) {
     return Container(

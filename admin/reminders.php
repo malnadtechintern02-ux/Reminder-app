@@ -82,6 +82,8 @@ $reminders = $stmt->fetchAll();
             <a href="priorities.php">Priorities</a>
             <a href="pomodoro.php">Pomodoro</a>
             <a href="notifications.php">Notifications</a>
+            <a href="ringtones.php">Ringtones</a>
+
             <a href="analytics.php">Analytics</a>
             <a href="pages.php">Pages</a>
             <a href="faqs.php">FAQs</a>
@@ -132,8 +134,12 @@ $reminders = $stmt->fetchAll();
                                     <?= htmlspecialchars($r['category_id']) ?> | <?= htmlspecialchars($r['priority']) ?>
                                     <?php if ($r['has_alarm']) echo ' 🔔'; ?>
                                     <?php if ($r['is_repeating']) echo ' 🔄'; ?>
+                                    <?php if (!empty($r['ringtone'])): ?>
+                                        | 🎵 <?= htmlspecialchars(ucwords(str_replace(['_', '-'], ' ', $r['ringtone']))) ?>
+                                    <?php endif; ?>
                                 </div>
                             </td>
+
                             <td><?= htmlspecialchars($r['username']) ?></td>
                             <td><?= date('M j, Y H:i', strtotime($r['scheduled_at'])) ?></td>
                             <td>

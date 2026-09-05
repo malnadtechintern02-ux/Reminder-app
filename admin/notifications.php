@@ -10,17 +10,18 @@ require_once '../api/db.php';
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $stmt = $pdo->prepare("UPDATE app_settings SET setting_value = ? WHERE setting_key = ?");
+    $stmt = $pdo->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
     
     $settings = [
         'notification_global' => isset($_POST['notification_global']) ? '1' : '0',
         'notification_sound' => isset($_POST['notification_sound']) ? '1' : '0',
         'notification_vibration' => isset($_POST['notification_vibration']) ? '1' : '0',
-        'notification_warning' => isset($_POST['notification_warning']) ? '1' : '0'
+        'notification_warning' => isset($_POST['notification_warning']) ? '1' : '0',
+        'default_ringtone' => trim($_POST['default_ringtone'] ?? 'morning_breeze'),
     ];
     
     foreach ($settings as $key => $val) {
-        $stmt->execute([$val, $key]);
+        $stmt->execute([$key, $val]);
     }
     
     log_admin_action($pdo, "Updated Notification Settings", "Defaults changed");
@@ -28,11 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Fetch current settings
-$stmt = $pdo->query("SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'notification_%'");
+$stmt = $pdo->query("SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'notification_%' OR setting_key = 'default_ringtone'");
 $current = [];
 while ($row = $stmt->fetch()) {
     $current[$row['setting_key']] = $row['setting_value'];
 }
+
+// Fetch active ringtones for default selector
+$activeRingtones = $pdo->query("SELECT ringtone_id, name, type FROM ringtones WHERE status = 1 ORDER BY type ASC, name ASC")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -44,6 +48,7 @@ while ($row = $stmt->fetch()) {
     <style>
         .form-group { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
         .form-group label { font-weight: 500; }
+        .form-select { padding: 10px; border-radius: 8px; border: 1px solid var(--border); font-family: inherit; width: 60%; font-size: 14px; background: var(--card-bg); color: var(--text-main); }
         .success-msg {
             background-color: rgba(16, 185, 129, 0.1); color: #10B981;
             padding: 12px; border-radius: 8px; margin-bottom: 20px;
@@ -63,6 +68,8 @@ while ($row = $stmt->fetch()) {
             <a href="priorities.php">Priorities</a>
             <a href="pomodoro.php">Pomodoro</a>
             <a href="notifications.php" class="active">Notifications</a>
+            <a href="ringtones.php">Ringtones</a>
+            <a href="analytics.php">Analytics</a>
             <a href="pages.php">Pages</a>
             <a href="faqs.php">FAQs</a>
             <a href="settings.php">Settings</a>
@@ -73,7 +80,7 @@ while ($row = $stmt->fetch()) {
 
     <div class="main-content">
         <div class="header">
-            <h1>Global Notification Settings</h1>
+            <h1>Global Notification & Alarm Settings</h1>
         </div>
 
         <div class="card" style="max-width: 600px;">
@@ -89,6 +96,16 @@ while ($row = $stmt->fetch()) {
                 <div class="form-group">
                     <label>Default Sound ON</label>
                     <input type="checkbox" name="notification_sound" <?= ($current['notification_sound'] ?? '1') == '1' ? 'checked' : '' ?> style="width: 20px; height: 20px;">
+                </div>
+                <div class="form-group">
+                    <label>Default Alarm Ringtone</label>
+                    <select name="default_ringtone" class="form-select">
+                        <?php foreach ($activeRingtones as $rt): ?>
+                            <option value="<?= htmlspecialchars($rt['ringtone_id']) ?>" <?= ($current['default_ringtone'] ?? 'morning_breeze') === $rt['ringtone_id'] ? 'selected' : '' ?>>
+                                🎵 <?= htmlspecialchars($rt['name']) ?> (<?= ucfirst($rt['type']) ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Default Vibration ON</label>

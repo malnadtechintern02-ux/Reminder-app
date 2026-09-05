@@ -69,9 +69,17 @@ if ($preview) {
             <a href="index.php">Dashboard</a>
             <a href="users.php">Users</a>
             <a href="reminders.php">Reminders</a>
+            <a href="schedule.php">Schedule</a>
+            <a href="categories.php">Categories</a>
+            <a href="priorities.php">Priorities</a>
+            <a href="pomodoro.php">Pomodoro</a>
+            <a href="notifications.php">Notifications</a>
+            <a href="ringtones.php">Ringtones</a>
+            <a href="analytics.php">Analytics</a>
             <a href="pages.php" class="active">Pages</a>
             <a href="faqs.php">FAQs</a>
             <a href="settings.php">Settings</a>
+            <a href="audit.php">Audit Log</a>
             <a href="logout.php" style="color: var(--danger); margin-top: auto;">Logout</a>
         </div>
     </div>

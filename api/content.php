@@ -38,6 +38,11 @@ if ($type === 'settings') {
     $stmt = $pdo->query("SELECT * FROM priorities WHERE status = 1 ORDER BY level ASC");
     $priorities = $stmt->fetchAll();
     echo json_encode(['success' => true, 'data' => $priorities]);
+} elseif ($type === 'ringtones') {
+    $stmt = $pdo->query("SELECT ringtone_id, name, description, type, file_name, file_path, file_size, duration, status FROM ringtones WHERE status = 1 ORDER BY type ASC, name ASC");
+    $ringtones = $stmt->fetchAll();
+    echo json_encode(['success' => true, 'data' => $ringtones]);
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid type parameter']);
 }
+
