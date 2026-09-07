@@ -4,6 +4,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../../features/reminders/domain/entities/reminder.dart';
 import '../../features/settings/providers/settings_provider.dart';
 
@@ -181,7 +182,7 @@ class NotificationService {
         );
       }
     } catch (e) {
-      print('Warning: Failed to schedule notification: $e');
+      debugPrint('Warning: Failed to schedule notification: $e');
     }
   }
 
@@ -214,7 +215,7 @@ class NotificationService {
         );
       }
     } catch (e) {
-      print('Warning: Failed to schedule repeating notification: $e');
+      debugPrint('Warning: Failed to schedule repeating notification: $e');
     }
   }
 
@@ -225,7 +226,7 @@ class NotificationService {
       await _localNotifications.cancel(id: notificationId * 2 + 1);
       await _localNotifications.cancel(id: notificationId);
     } catch (e) {
-      print('Warning: Failed to cancel notification: $e');
+      debugPrint('Warning: Failed to cancel notification: $e');
     }
   }
 
@@ -250,7 +251,7 @@ class NotificationService {
 
   Future<fln.NotificationDetails> _getAlarmNotificationDetails(Reminder reminder) async {
     final prefs = await SharedPreferences.getInstance();
-    final globalRingtone = prefs.getString('defaultRingtone') ?? 'morning_alarm';
+    final globalRingtone = prefs.getString('defaultRingtone') ?? 'morning_breeze';
     final ringtoneId = (reminder.ringtone != null && reminder.ringtone!.isNotEmpty)
         ? reminder.ringtone!
         : globalRingtone;

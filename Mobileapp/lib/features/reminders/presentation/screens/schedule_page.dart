@@ -78,7 +78,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
+                  color: Colors.grey.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -169,22 +169,29 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline_rounded),
-            onPressed: () => context.pushNamed(RouteNames.createReminder),
+            onPressed: () => context.pushNamed(RouteNames.createReminder, extra: _selectedDate),
           ),
         ],
       ),
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverToBoxAdapter(child: _buildDateNavigator(theme)),
-          SliverToBoxAdapter(child: _buildProgressCard(theme, totalTasks, completedTasks, pendingTasks, progress)),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-        ],
-        body: totalTasks == 0
-            ? _buildEmptyState(theme)
-            : _buildTimeline(theme, dayReminders, categoriesAsync),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(reminderListNotifierProvider.notifier).syncWithServer();
+          ref.invalidate(categoriesFutureProvider);
+          ref.invalidate(prioritiesFutureProvider);
+        },
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverToBoxAdapter(child: _buildDateNavigator(theme)),
+            SliverToBoxAdapter(child: _buildProgressCard(theme, totalTasks, completedTasks, pendingTasks, progress)),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          ],
+          body: totalTasks == 0
+              ? _buildEmptyState(theme)
+              : _buildTimeline(theme, dayReminders, categoriesAsync),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.pushNamed(RouteNames.createReminder),
+        onPressed: () => context.pushNamed(RouteNames.createReminder, extra: _selectedDate),
         child: const Icon(Icons.add),
       ),
     );
@@ -259,7 +266,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: theme.shadowColor.withOpacity(0.05),
+              color: theme.shadowColor.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -318,23 +325,25 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   }
 
   Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('📅', style: TextStyle(fontSize: 64)),
-          const SizedBox(height: 16),
-          Text('Your schedule is clear', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('No tasks planned for this day.', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: () => context.pushNamed(RouteNames.createReminder),
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+      children: [
+        const SizedBox(height: 40),
+        const Center(child: Text('📅', style: TextStyle(fontSize: 64))),
+        const SizedBox(height: 16),
+        Center(child: Text('Your schedule is clear', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
+        const SizedBox(height: 8),
+        Center(child: Text('No tasks planned for this day.', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+        const SizedBox(height: 24),
+        Center(
+          child: FilledButton.icon(
+            onPressed: () => context.pushNamed(RouteNames.createReminder, extra: _selectedDate),
             icon: const Icon(Icons.add),
             label: const Text('Add Schedule'),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -356,6 +365,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: timelineItems.length,
       itemBuilder: (context, index) {
@@ -435,12 +445,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     final categoryColor = category != null ? parseHexColor(category.color) : theme.primaryColor;
 
     // Resolve Priority
-    Color priorityColor;
-    switch (reminder.priority) {
-      case Priority.high: priorityColor = theme.colorScheme.error; break;
-      case Priority.medium: priorityColor = Colors.amber; break;
-      case Priority.low: priorityColor = theme.colorScheme.secondary; break;
-    }
+    final priorityColor = getPriorityColor(reminder.priority, theme);
 
     // Duration calculation
     String durationText = '';
@@ -501,7 +506,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
                   ),
                 )
               else
@@ -520,14 +525,14 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isMissed ? theme.colorScheme.errorContainer.withOpacity(0.3) : theme.cardColor,
+                      color: isMissed ? theme.colorScheme.errorContainer.withValues(alpha: 0.3) : theme.cardColor,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isMissed ? theme.colorScheme.error.withOpacity(0.5) : Colors.transparent,
+                        color: isMissed ? theme.colorScheme.error.withValues(alpha: 0.5) : Colors.transparent,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: theme.shadowColor.withOpacity(0.03),
+                          color: theme.shadowColor.withValues(alpha: 0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -586,8 +591,16 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                               _buildChip(category.name, categoryColor, theme),
                             if (durationText.isNotEmpty)
                               _buildChip(durationText, theme.colorScheme.secondary, theme, isOutlined: true),
-                            if (reminder.priority == Priority.high)
-                              _buildChip('HIGH PRIORITY', priorityColor, theme),
+                            if (reminder.priority != Priority.low)
+                              _buildChip('${reminder.priority.name.toUpperCase()} PRIORITY', priorityColor, theme),
+                            if (reminder.alarmEnabled && reminder.alarmSoundEnabled)
+                              _buildChip(
+                                formatRingtoneName(reminder.ringtone),
+                                Colors.amber.shade800,
+                                theme,
+                                isOutlined: true,
+                                icon: Icons.music_note_rounded,
+                              ),
                             if (reminder.hasAlarm)
                               const Icon(Icons.notifications_active_rounded, size: 16, color: Colors.amber),
                             if (reminder.isRepeating)
@@ -606,21 +619,30 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  Widget _buildChip(String label, Color color, ThemeData theme, {bool isOutlined = false}) {
+  Widget _buildChip(String label, Color color, ThemeData theme, {bool isOutlined = false, IconData? icon}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isOutlined ? Colors.transparent : color.withOpacity(0.1),
+        color: isOutlined ? Colors.transparent : color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: isOutlined ? Border.all(color: color.withOpacity(0.5)) : null,
+        border: isOutlined ? Border.all(color: color.withValues(alpha: 0.5)) : null,
       ),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

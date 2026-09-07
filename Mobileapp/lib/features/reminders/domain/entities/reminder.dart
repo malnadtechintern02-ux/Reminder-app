@@ -1,14 +1,71 @@
-enum Priority {
-  low,
-  medium,
-  high;
+class Priority {
+  final String id;
+  final String name;
+  final int level;
 
-  static Priority fromString(String value) {
-    return Priority.values.firstWhere(
-      (e) => e.name == value.toLowerCase(),
-      orElse: () => Priority.low,
+  const Priority({
+    required this.name,
+    this.id = '',
+    this.level = 1,
+  });
+
+  static const Priority low = Priority(name: 'low', level: 1);
+  static const Priority medium = Priority(name: 'medium', level: 2);
+  static const Priority high = Priority(name: 'high', level: 3);
+  static const Priority urgent = Priority(name: 'urgent', level: 4);
+
+  static const List<Priority> defaultPriorities = [low, medium, high, urgent];
+
+  static Priority fromString(String? value) {
+    if (value == null || value.trim().isEmpty) return Priority.low;
+    final clean = value.trim().toLowerCase();
+    switch (clean) {
+      case 'urgent':
+        return Priority.urgent;
+      case 'high':
+        return Priority.high;
+      case 'medium':
+        return Priority.medium;
+      case 'low':
+        return Priority.low;
+      default:
+        return Priority(name: clean, level: 2);
+    }
+  }
+
+  factory Priority.fromMap(Map<String, dynamic> map) {
+    int parseLevel(dynamic val) {
+      if (val is int) return val;
+      return int.tryParse(val?.toString() ?? '1') ?? 1;
+    }
+
+    final rawName = map['name']?.toString().trim() ?? 'low';
+    return Priority(
+      id: map['id']?.toString() ?? '',
+      name: rawName,
+      level: parseLevel(map['level']),
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id.isNotEmpty ? id : name.toLowerCase(),
+      'name': name,
+      'level': level,
+      'status': 1,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Priority && name.toLowerCase() == other.name.toLowerCase());
+
+  @override
+  int get hashCode => name.toLowerCase().hashCode;
+
+  @override
+  String toString() => name;
 }
 
 enum RepeatType {

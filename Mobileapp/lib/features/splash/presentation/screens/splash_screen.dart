@@ -123,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen>
                         boxShadow: [
                           BoxShadow(
                             color: theme.primaryColor
-                                .withOpacity(0.3 * _pulseAnimation.value),
+                                .withValues(alpha: 0.3 * _pulseAnimation.value),
                             blurRadius: 40 * _pulseAnimation.value,
                             spreadRadius: 8 * _pulseAnimation.value,
                           ),
@@ -141,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                 // App name
                 Text(
-                  'Reminder',
+                  'Time Bell',
                   style: TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.bold,
@@ -154,7 +154,7 @@ class _SplashScreenState extends State<SplashScreen>
                   'Never miss a moment',
                   style: TextStyle(
                     fontSize: 15,
-                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -167,7 +167,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      theme.primaryColor.withOpacity(0.6),
+                      theme.primaryColor.withValues(alpha: 0.6),
                     ),
                   ),
                 ),

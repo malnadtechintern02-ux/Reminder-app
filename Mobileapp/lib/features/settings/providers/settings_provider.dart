@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../../app/theme/theme_provider.dart';
 
@@ -29,6 +30,16 @@ const List<BuiltInRingtone> builtInRingtones = [
   BuiltInRingtone(id: 'focus_start', name: 'Focus Start'),
   BuiltInRingtone(id: 'classic_modern', name: 'Classic Modern'),
 ];
+
+String formatRingtoneName(String? ringtoneId) {
+  if (ringtoneId == null || ringtoneId.isEmpty) {
+    return 'Morning Breeze';
+  }
+  for (final r in builtInRingtones) {
+    if (r.id == ringtoneId) return r.name;
+  }
+  return p.basename(ringtoneId);
+}
 
 
 class SettingsState {

@@ -47,13 +47,13 @@ class CategorySelector extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? categoryColor.withOpacity(0.18)
-                        : theme.colorScheme.onSurface.withOpacity(0.04),
+                        ? categoryColor.withValues(alpha: 0.18)
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isSelected
                           ? categoryColor
-                          : theme.colorScheme.outline.withOpacity(0.2),
+                          : theme.colorScheme.outline.withValues(alpha: 0.2),
                       width: isSelected ? 2 : 1,
                     ),
                   ),

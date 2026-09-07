@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'dart:convert';
 import '../../../../app/theme/theme_provider.dart';
 import '../../../../app/app.dart';
 import '../../providers/settings_provider.dart';
 import '../../../reminders/presentation/providers/reminder_list_provider.dart';
+import '../../../../core/network/api_sync_service.dart';
 
-import 'package:path/path.dart' as p;
 import 'ringtone_selection_screen.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -27,7 +28,7 @@ class SettingsPage extends ConsumerWidget {
           children: [
             const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
             Text(
-              'Customize your FocusDay experience',
+              'Customize your Time Bell experience',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -197,6 +198,90 @@ class SettingsPage extends ConsumerWidget {
           ),
 
           _SettingsSection(
+            title: 'Server & Synchronization',
+            children: [
+              FutureBuilder<String>(
+                future: ApiSyncService.getBaseUrl(),
+                builder: (context, snapshot) {
+                  final currentUrl = snapshot.data ?? ApiSyncService.defaultBaseUrl;
+                  return _SettingsTile(
+                    title: 'Server Sync URL',
+                    subtitle: currentUrl,
+                    icon: Icons.cloud_sync_outlined,
+                    trailing: const Icon(Icons.edit_outlined, size: 20),
+                    showDivider: true,
+                    onTap: () async {
+                      final controller = TextEditingController(text: currentUrl);
+                      final newUrl = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Server Sync URL'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Enter your backend API URL (local IP or hosted domain):',
+                                style: TextStyle(fontSize: 13),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: controller,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  hintText: 'http://192.168.x.x/reminderapp/api',
+                                ),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (newUrl != null && newUrl.isNotEmpty) {
+                        await ApiSyncService.setBaseUrl(newUrl);
+                        await ref.read(reminderListNotifierProvider.notifier).syncWithServer();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Server URL updated to $newUrl')),
+                          );
+                        }
+                      }
+                    },
+                  );
+                },
+              ),
+              _SettingsTile(
+                title: 'Sync Now',
+                subtitle: 'Pull latest reminders from admin panel',
+                icon: Icons.sync_rounded,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                showDivider: false,
+                onTap: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Syncing with admin panel...'), duration: Duration(seconds: 1)),
+                  );
+                  await ref.read(reminderListNotifierProvider.notifier).syncWithServer();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sync complete!')),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+
+          _SettingsSection(
             title: 'About & Legal',
             children: [
               ref.watch(packageInfoProvider).when(
@@ -223,8 +308,16 @@ class SettingsPage extends ConsumerWidget {
                 ),
               ),
               _SettingsTile(
+                title: 'Rate Time Bell',
+                subtitle: 'Leave a review on Google Play',
+                icon: Icons.star_rate_rounded,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                onTap: () => _openPlayStoreRating(context),
+                showDivider: true,
+              ),
+              _SettingsTile(
                 title: 'Privacy Policy',
-                subtitle: 'Learn how FocusDay handles your data',
+                subtitle: 'Learn how Time Bell handles your data',
                 icon: Icons.privacy_tip_outlined,
                 trailing: const Icon(Icons.chevron_right_rounded, size: 20),
                 onTap: () {
@@ -244,11 +337,40 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  String _formatRingtoneName(String ringtoneId) {
-    for (final r in builtInRingtones) {
-      if (r.id == ringtoneId) return r.name;
+  Future<void> _openPlayStoreRating(BuildContext context) async {
+    const packageName = 'com.reminderapp.reminder_app';
+    final marketUri = Uri.parse('market://details?id=$packageName');
+    final webUri = Uri.parse('https://play.google.com/store/apps/details?id=$packageName');
+
+    try {
+      if (await canLaunchUrl(marketUri)) {
+        await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open Google Play Store.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open rating page: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
-    return p.basename(ringtoneId);
+  }
+
+  String _formatRingtoneName(String ringtoneId) {
+    return formatRingtoneName(ringtoneId);
   }
 
 
@@ -288,7 +410,7 @@ class SettingsPage extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'FocusDay',
+                  'Time Bell',
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: isDarkMode ? theme.colorScheme.onSurface : theme.colorScheme.onPrimaryContainer,
@@ -318,35 +440,37 @@ class SettingsPage extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Select Duration'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: options.map((mins) {
-            return RadioListTile<int>(
-              title: Text('$mins minutes'),
-              value: mins,
-              groupValue: current,
-              onChanged: (val) {
-                if (val != null) {
-                  final notifier = ref.read(settingsNotifierProvider.notifier);
-                  switch (type) {
-                    case 'snooze':
-                      notifier.setDefaultSnoozeDuration(val);
-                      break;
-                    case 'workDuration':
-                      notifier.setWorkDuration(val);
-                      break;
-                    case 'shortBreakDuration':
-                      notifier.setShortBreakDuration(val);
-                      break;
-                    case 'longBreakDuration':
-                      notifier.setLongBreakDuration(val);
-                      break;
-                  }
-                  Navigator.pop(ctx);
-                }
-              },
-            );
-          }).toList(),
+        content: RadioGroup<int>(
+          groupValue: current,
+          onChanged: (val) {
+            if (val != null) {
+              final notifier = ref.read(settingsNotifierProvider.notifier);
+              switch (type) {
+                case 'snooze':
+                  notifier.setDefaultSnoozeDuration(val);
+                  break;
+                case 'workDuration':
+                  notifier.setWorkDuration(val);
+                  break;
+                case 'shortBreakDuration':
+                  notifier.setShortBreakDuration(val);
+                  break;
+                case 'longBreakDuration':
+                  notifier.setLongBreakDuration(val);
+                  break;
+              }
+              Navigator.pop(ctx);
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: options.map((mins) {
+              return RadioListTile<int>(
+                title: Text('$mins minutes'),
+                value: mins,
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -593,7 +717,7 @@ class _SettingsSwitch extends StatelessWidget {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: Theme.of(context).colorScheme.primary,
+        activeThumbColor: Theme.of(context).colorScheme.primary,
       ),
     );
   }
@@ -646,7 +770,7 @@ class _AccentColorPicker extends ConsumerWidget {
             // Custom Color Button
             GestureDetector(
               onTap: () {
-                _showColorPicker(context, ref, customAccentColor ?? appAccentColors[0].value);
+                _showColorPicker(context, ref, customAccentColor ?? appAccentColors[0].toARGB32());
               },
               child: Container(
                 margin: const EdgeInsets.only(right: 12),
@@ -708,7 +832,7 @@ class _AccentColorPicker extends ConsumerWidget {
             ElevatedButton(
               child: const Text('Select'),
               onPressed: () {
-                ref.read(settingsNotifierProvider.notifier).setCustomAccentColor(pickerColor.value);
+                ref.read(settingsNotifierProvider.notifier).setCustomAccentColor(pickerColor.toARGB32());
                 Navigator.of(context).pop();
               },
             ),
@@ -747,7 +871,7 @@ class PrivacyPolicyPage extends StatelessWidget {
             _buildSection(
               theme,
               '1. Introduction',
-              'FocusDay is a reminder and productivity application designed to help you organize your daily tasks. We respect your privacy and are committed to protecting it through our compliance with this policy.',
+              'Time Bell is a reminder and productivity application designed to help you organize your daily tasks. We respect your privacy and are committed to protecting it through our compliance with this policy.',
             ),
             _buildSection(
               theme,
@@ -768,12 +892,12 @@ class PrivacyPolicyPage extends StatelessWidget {
             _buildSection(
               theme,
               '4. Data Storage',
-              'All data collected by FocusDay is stored locally on your device. We do not use cloud storage, nor do we transmit your reminders or tasks to external servers.',
+              'All data collected by Time Bell is stored locally on your device. We do not use cloud storage, nor do we transmit your reminders or tasks to external servers.',
             ),
             _buildSection(
               theme,
               '5. Notifications',
-              'FocusDay requires notification permissions to alert you about scheduled reminders. These notifications are generated locally on your device and are not pushed from a remote server.',
+              'Time Bell requires notification permissions to alert you about scheduled reminders. These notifications are generated locally on your device and are not pushed from a remote server.',
             ),
             _buildSection(
               theme,

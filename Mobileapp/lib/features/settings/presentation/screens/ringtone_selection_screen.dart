@@ -9,7 +9,14 @@ import 'package:path/path.dart' as p;
 import '../../providers/settings_provider.dart';
 
 class RingtoneSelectionScreen extends ConsumerStatefulWidget {
-  const RingtoneSelectionScreen({super.key});
+  final String? initialRingtone;
+  final bool isSelectingForReminder;
+
+  const RingtoneSelectionScreen({
+    super.key,
+    this.initialRingtone,
+    this.isSelectingForReminder = false,
+  });
 
   @override
   ConsumerState<RingtoneSelectionScreen> createState() => _RingtoneSelectionScreenState();
@@ -19,11 +26,13 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
   final AudioPlayer _audioPlayer = AudioPlayer();
   String? _currentlyPlaying;
   String? _loadingId;
+  String? _selectedRingtoneId;
   StreamSubscription? _playerCompleteSubscription;
 
   @override
   void initState() {
     super.initState();
+    _selectedRingtoneId = widget.initialRingtone;
     _playerCompleteSubscription = _audioPlayer.onPlayerComplete.listen((event) {
       if (mounted) {
         setState(() {
@@ -117,7 +126,7 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
         allowedExtensions: ['mp3', 'wav', 'm4a', 'ogg'],
       );
 
-      if (result != null && result.isNotEmpty) {
+      if (result.isNotEmpty) {
         final path = result.first.path;
         if (path == null) return;
         final sourceFile = File(path);
@@ -143,6 +152,12 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
         await sourceFile.copy(targetPath);
 
         await ref.read(settingsNotifierProvider.notifier).addCustomRingtone(targetPath);
+        setState(() {
+          _selectedRingtoneId = targetPath;
+        });
+        if (!widget.isSelectingForReminder) {
+          await ref.read(settingsNotifierProvider.notifier).setDefaultRingtone(targetPath);
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -195,6 +210,11 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
         await file.delete();
       }
       await ref.read(settingsNotifierProvider.notifier).removeCustomRingtone(path);
+      if (_selectedRingtoneId == path) {
+        setState(() {
+          _selectedRingtoneId = 'morning_breeze';
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -204,19 +224,63 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
     }
   }
 
+  void _selectRingtone(String id) {
+    setState(() {
+      _selectedRingtoneId = id;
+    });
+    if (!widget.isSelectingForReminder) {
+      ref.read(settingsNotifierProvider.notifier).setDefaultRingtone(id);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsNotifierProvider);
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
+    final currentSelected = _selectedRingtoneId ?? settings.defaultRingtone;
 
     return PopScope(
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
         await _audioPlayer.stop();
+        if (context.mounted) {
+          if (widget.isSelectingForReminder) {
+            Navigator.pop(context, currentSelected);
+          } else {
+            Navigator.pop(context);
+          }
+        }
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Select Ringtone'),
+          title: Text(widget.isSelectingForReminder ? 'Select Alarm Ringtone' : 'Select Ringtone'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              await _audioPlayer.stop();
+              if (context.mounted) {
+                if (widget.isSelectingForReminder) {
+                  Navigator.pop(context, currentSelected);
+                } else {
+                  Navigator.pop(context);
+                }
+              }
+            },
+          ),
+          actions: [
+            if (widget.isSelectingForReminder)
+              TextButton(
+                onPressed: () async {
+                  await _audioPlayer.stop();
+                  if (context.mounted) {
+                    Navigator.pop(context, currentSelected);
+                  }
+                },
+                child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+          ],
         ),
         body: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -234,7 +298,7 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
               ),
             ),
             ...builtInRingtones.map((ringtone) {
-              final isSelected = settings.defaultRingtone == ringtone.id;
+              final isSelected = currentSelected == ringtone.id;
               final isPlaying = _currentlyPlaying == ringtone.id;
               final isLoading = _loadingId == ringtone.id;
 
@@ -246,9 +310,7 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
                 isSelected: isSelected,
                 isPlaying: isPlaying,
                 isLoading: isLoading,
-                onSelect: () {
-                  ref.read(settingsNotifierProvider.notifier).setDefaultRingtone(ringtone.id);
-                },
+                onSelect: () => _selectRingtone(ringtone.id),
                 onPlay: () => _playRingtone(ringtone.id),
               );
             }),
@@ -275,7 +337,7 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
                 ),
               ),
             ...settings.customRingtones.map((path) {
-              final isSelected = settings.defaultRingtone == path;
+              final isSelected = currentSelected == path;
               final isPlaying = _currentlyPlaying == path;
               final isLoading = _loadingId == path;
               final name = p.basename(path);
@@ -288,9 +350,7 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
                 isSelected: isSelected,
                 isPlaying: isPlaying,
                 isLoading: isLoading,
-                onSelect: () {
-                  ref.read(settingsNotifierProvider.notifier).setDefaultRingtone(path);
-                },
+                onSelect: () => _selectRingtone(path),
                 onPlay: () => _playRingtone(path, isCustom: true),
                 onDelete: () => _deleteCustomRingtone(path),
               );

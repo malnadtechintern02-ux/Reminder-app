@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/reminder.dart';
 import '../../domain/repositories/reminder_repository.dart';
@@ -11,6 +12,8 @@ import '../../../../core/network/api_sync_service.dart';
 import '../../../categories/domain/entities/category.dart';
 import '../../../categories/domain/repositories/category_repository.dart';
 import '../../../categories/data/repositories/category_repository_impl.dart';
+import '../../domain/repositories/priority_repository.dart';
+import '../../data/repositories/priority_repository_impl.dart';
 
 // Repositories
 final reminderRepositoryProvider = Provider<ReminderRepository>((ref) {
@@ -19,6 +22,10 @@ final reminderRepositoryProvider = Provider<ReminderRepository>((ref) {
 
 final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   return CategoryRepositoryImpl();
+});
+
+final priorityRepositoryProvider = Provider<PriorityRepository>((ref) {
+  return PriorityRepositoryImpl();
 });
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
@@ -51,9 +58,13 @@ final toggleCompletionUseCaseProvider = Provider<ToggleCompletionUseCase>((ref) 
   );
 });
 
-// Categories provider
+// Categories & Priorities providers
 final categoriesFutureProvider = FutureProvider<List<Category>>((ref) async {
   return await ref.watch(categoryRepositoryProvider).getCategories();
+});
+
+final prioritiesFutureProvider = FutureProvider<List<Priority>>((ref) async {
+  return await ref.watch(priorityRepositoryProvider).getPriorities();
 });
 
 // State definitions
@@ -96,12 +107,14 @@ class ReminderListNotifier extends StateNotifier<ReminderListState> {
   final SaveReminderUseCase _saveReminder;
   final DeleteReminderUseCase _deleteReminder;
   final ToggleCompletionUseCase _toggleCompletion;
+  final Ref _ref;
 
   ReminderListNotifier(
     this._getReminders,
     this._saveReminder,
     this._deleteReminder,
     this._toggleCompletion,
+    this._ref,
   ) : super(ReminderListState(reminders: [], isLoading: true, searchQuery: '')) {
     loadReminders();
   }
@@ -111,14 +124,26 @@ class ReminderListNotifier extends StateNotifier<ReminderListState> {
       state = state.copyWith(isLoading: true);
       final list = await _getReminders();
       state = state.copyWith(reminders: list, isLoading: false);
-      _syncToServer(list);
+      await syncWithServer();
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }
 
+  Future<void> syncWithServer() async {
+    try {
+      final syncedList = await ApiSyncService.performTwoWaySync();
+      if (syncedList != null) {
+        state = state.copyWith(reminders: syncedList);
+      }
+      _ref.invalidate(categoriesFutureProvider);
+      _ref.invalidate(prioritiesFutureProvider);
+    } catch (e) {
+      // Offline fallback
+    }
+  }
+
   Future<void> _syncToServer(List<Reminder> list) async {
-    // Fire and forget sync to keep admin panel updated
     ApiSyncService.syncReminders(list);
   }
 
@@ -143,7 +168,7 @@ class ReminderListNotifier extends StateNotifier<ReminderListState> {
       // Run sync in the background
       _syncToServer(state.reminders);
     } catch (e) {
-      print('Reminder save failed: $e');
+      debugPrint('Reminder save failed: $e');
       state = state.copyWith(
         reminders: previousReminders,
         errorMessage: e.toString(),
@@ -163,7 +188,7 @@ class ReminderListNotifier extends StateNotifier<ReminderListState> {
       _syncToServer(state.reminders);
     } catch (e) {
       // Rollback on error
-      print('Reminder delete failed: $e');
+      debugPrint('Reminder delete failed: $e');
       state = state.copyWith(
         reminders: previousReminders,
         errorMessage: e.toString(),
@@ -201,6 +226,7 @@ final reminderListNotifierProvider =
     ref.watch(saveReminderUseCaseProvider),
     ref.watch(deleteReminderUseCaseProvider),
     ref.watch(toggleCompletionUseCaseProvider),
+    ref,
   );
 });
 

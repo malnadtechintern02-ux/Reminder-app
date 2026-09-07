@@ -142,7 +142,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> with SingleTicker
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                color: theme.primaryColor.withOpacity(0.12),
+                color: theme.primaryColor.withValues(alpha: 0.12),
               ),
               labelColor: theme.primaryColor,
               unselectedLabelColor: theme.textTheme.bodyMedium?.color,
@@ -158,14 +158,21 @@ class _RemindersPageState extends ConsumerState<RemindersPage> with SingleTicker
           Expanded(
             child: listState.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      // Active Reminders
-                      _buildActiveTab(context, groupedActive),
-                      // Completed Reminders
-                      _buildCompletedTab(context, completedReminders),
-                    ],
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      await ref.read(reminderListNotifierProvider.notifier).syncWithServer();
+                      ref.invalidate(categoriesFutureProvider);
+                      ref.invalidate(prioritiesFutureProvider);
+                    },
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        // Active Reminders
+                        _buildActiveTab(context, groupedActive),
+                        // Completed Reminders
+                        _buildCompletedTab(context, completedReminders),
+                      ],
+                    ),
                   ),
           ),
         ],
@@ -266,6 +273,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> with SingleTicker
     final sections = ['Overdue', 'Today', 'Tomorrow', 'Upcoming'];
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
       itemCount: sections.length,
       itemBuilder: (context, index) {
@@ -307,6 +315,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> with SingleTicker
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
       itemCount: reminders.length,
       itemBuilder: (context, index) {
@@ -317,24 +326,23 @@ class _RemindersPageState extends ConsumerState<RemindersPage> with SingleTicker
 
   Widget _buildEmptyState(BuildContext context, IconData icon, String title, String subtitle) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 72, color: theme.colorScheme.outline.withOpacity(0.5)),
-            const SizedBox(height: 16),
-            Text(title, style: theme.textTheme.titleMedium?.copyWith(fontSize: 18)),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+      children: [
+        const SizedBox(height: 32),
+        Center(child: Icon(icon, size: 72, color: theme.colorScheme.outline.withValues(alpha: 0.5))),
+        const SizedBox(height: 16),
+        Center(child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontSize: 18))),
+        const SizedBox(height: 8),
+        Center(
+          child: Text(
+            subtitle,
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
         ),
-      ),
+      ],
     );
   }
 }

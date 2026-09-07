@@ -21,7 +21,7 @@ class SqliteDatabase {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onConfigure: _onConfigure,
@@ -45,6 +45,16 @@ class SqliteDatabase {
     if (oldVersion < 5) {
       await db.execute('ALTER TABLE reminders ADD COLUMN ringtone TEXT');
     }
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS priorities (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          level INTEGER NOT NULL,
+          status INTEGER NOT NULL DEFAULT 1
+        )
+      ''');
+    }
   }
 
   Future _onConfigure(Database db) async {
@@ -52,6 +62,16 @@ class SqliteDatabase {
   }
 
   Future _createDB(Database db, int version) async {
+    // Create priorities table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS priorities (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        level INTEGER NOT NULL,
+        status INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+
     // Create categories table
     await db.execute('''
       CREATE TABLE categories (

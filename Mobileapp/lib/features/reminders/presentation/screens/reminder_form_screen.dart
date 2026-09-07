@@ -8,13 +8,17 @@ import '../../domain/entities/reminder.dart';
 import '../widgets/category_selector.dart';
 import '../../../../core/utils/permission_helper.dart';
 import '../../../settings/providers/settings_provider.dart';
+import '../../../settings/presentation/screens/ringtone_selection_screen.dart';
+import '../../../../core/utils/ui_helpers.dart';
 
 class ReminderFormScreen extends ConsumerStatefulWidget {
   final String? reminderId;
+  final DateTime? initialDate;
 
   const ReminderFormScreen({
     super.key,
     this.reminderId,
+    this.initialDate,
   });
 
   @override
@@ -41,6 +45,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
   bool _alarmSoundEnabled = true;
   bool _alarmVibrationEnabled = true;
   int _snoozeMinutes = 5;
+  String? _selectedRingtone;
   bool _isEdit = false;
 
   @override
@@ -49,6 +54,18 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
     _titleController = TextEditingController();
     _descController = TextEditingController();
     _isEdit = widget.reminderId != null;
+
+    if (widget.initialDate != null) {
+      final now = DateTime.now();
+      _selectedDate = DateTime(
+        widget.initialDate!.year,
+        widget.initialDate!.month,
+        widget.initialDate!.day,
+        now.hour + 1,
+        0,
+      );
+      _selectedTime = TimeOfDay(hour: (now.hour + 1) % 24, minute: 0);
+    }
 
     // Post frame callback to populate editing fields
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -77,6 +94,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
           _alarmSoundEnabled = reminder.alarmSoundEnabled;
           _alarmVibrationEnabled = reminder.alarmVibrationEnabled;
           _snoozeMinutes = reminder.snoozeMinutes;
+          _selectedRingtone = reminder.ringtone ?? ref.read(settingsNotifierProvider).defaultRingtone;
         });
       } else {
         // Set default category and settings for new reminder
@@ -97,6 +115,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
           _alarmSoundEnabled = settings.alarmSoundEnabled;
           _alarmVibrationEnabled = settings.alarmVibrationEnabled;
           _snoozeMinutes = settings.defaultSnoozeDuration;
+          _selectedRingtone = settings.defaultRingtone;
         });
       }
     });
@@ -143,6 +162,25 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
     if (picked != null) {
       setState(() {
         _selectedEndTime = picked;
+      });
+    }
+  }
+
+  Future<void> _pickRingtone() async {
+    final defaultTone = ref.read(settingsNotifierProvider).defaultRingtone;
+    final selected = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RingtoneSelectionScreen(
+          initialRingtone: _selectedRingtone ?? defaultTone,
+          isSelectingForReminder: true,
+        ),
+      ),
+    );
+
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedRingtone = selected;
       });
     }
   }
@@ -211,6 +249,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
       alarmSoundEnabled: _alarmSoundEnabled,
       alarmVibrationEnabled: _alarmVibrationEnabled,
       snoozeMinutes: _snoozeMinutes,
+      ringtone: _selectedRingtone,
       createdAt: _isEdit
           ? ref.read(reminderListNotifierProvider).reminders.firstWhere((r) => r.id == widget.reminderId).createdAt
           : DateTime.now(),
@@ -456,6 +495,41 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                           });
                         },
                       ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: Icon(
+                          Icons.music_note_rounded,
+                          color: _alarmSoundEnabled ? theme.colorScheme.primary : theme.disabledColor,
+                        ),
+                        title: Text(
+                          'Alarm Ringtone',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: _alarmSoundEnabled ? null : theme.disabledColor,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _alarmSoundEnabled
+                              ? formatRingtoneName(_selectedRingtone ?? ref.read(settingsNotifierProvider).defaultRingtone)
+                              : 'Sound is muted (Silent)',
+                          style: TextStyle(
+                            color: _alarmSoundEnabled ? theme.colorScheme.primary : theme.disabledColor,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: _alarmSoundEnabled ? null : theme.disabledColor,
+                        ),
+                        onTap: () {
+                          if (!_alarmSoundEnabled) {
+                            setState(() {
+                              _alarmSoundEnabled = true;
+                            });
+                          }
+                          _pickRingtone();
+                        },
+                      ),
+                      const Divider(height: 1),
                       SwitchListTile(
                         title: const Text('Vibration'),
                         value: _alarmVibrationEnabled,
@@ -564,7 +638,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
   }
 }
 
-class CrossPriorityWidget extends StatelessWidget {
+class CrossPriorityWidget extends ConsumerWidget {
   final Priority currentPriority;
   final ValueChanged<Priority> onChanged;
 
@@ -575,9 +649,13 @@ class CrossPriorityWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final priorities = Priority.values;
+    final prioritiesAsync = ref.watch(prioritiesFutureProvider);
+    final priorities = prioritiesAsync.maybeWhen(
+      data: (list) => list.isNotEmpty ? list : Priority.defaultPriorities,
+      orElse: () => Priority.defaultPriorities,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -587,54 +665,61 @@ class CrossPriorityWidget extends StatelessWidget {
           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 10),
-        Row(
-          children: priorities.map((p) {
-            final isSelected = p == currentPriority;
-            Color priorityColor;
-            switch (p) {
-              case Priority.high:
-                priorityColor = theme.colorScheme.error;
-                break;
-              case Priority.medium:
-                priorityColor = Colors.amber;
-                break;
-              case Priority.low:
-                priorityColor = theme.colorScheme.secondary;
-                break;
-            }
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: priorities.map((p) {
+              final isSelected = p == currentPriority;
+              final priorityColor = getPriorityColor(p, theme);
+              final isUrgent = p.name.toLowerCase().contains('urgent') ||
+                  p.name.toLowerCase().contains('critical');
 
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
                 child: GestureDetector(
                   onTap: () => onChanged(p),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? priorityColor.withOpacity(0.18)
-                          : theme.colorScheme.onSurface.withOpacity(0.04),
+                          ? priorityColor.withValues(alpha: 0.18)
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? priorityColor : theme.colorScheme.outline.withOpacity(0.2),
+                        color: isSelected ? priorityColor : theme.colorScheme.outline.withValues(alpha: 0.2),
                         width: isSelected ? 2 : 1,
                       ),
                     ),
-                    child: Text(
-                      p.name.toUpperCase(),
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: isSelected ? priorityColor : theme.textTheme.bodyLarge?.color,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 13,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isUrgent)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6.0),
+                            child: Icon(
+                              Icons.warning_amber_rounded,
+                              size: 16,
+                              color: isSelected ? priorityColor : theme.textTheme.bodyLarge?.color,
+                            ),
+                          ),
+                        Text(
+                          p.name.toUpperCase(),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: isSelected ? priorityColor : theme.textTheme.bodyLarge?.color,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ],
     );

@@ -51,7 +51,10 @@ final GoRouter appRouter = GoRouter(
                   // create reminder path without slash since it's a nested route
                   path: 'create',
                   name: RouteNames.createReminder,
-                  builder: (context, state) => const ReminderFormScreen(),
+                  builder: (context, state) {
+                    final initialDate = state.extra as DateTime?;
+                    return ReminderFormScreen(initialDate: initialDate);
+                  },
                 ),
                 GoRoute(
                   path: 'edit/:id',

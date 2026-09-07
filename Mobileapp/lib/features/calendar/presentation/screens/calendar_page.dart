@@ -75,12 +75,12 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 weekendStyle: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
               calendarStyle: CalendarStyle(
                 todayDecoration: BoxDecoration(
-                  color: theme.primaryColor.withOpacity(0.5),
+                  color: theme.primaryColor.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                 ),
                 selectedDecoration: BoxDecoration(
@@ -107,7 +107,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.event_busy_rounded, size: 64, color: theme.colorScheme.outline.withOpacity(0.5)),
+                    Icon(Icons.event_busy_rounded, size: 64, color: theme.colorScheme.outline.withValues(alpha: 0.5)),
                     const SizedBox(height: 16),
                     Text(
                       'No events for this day',

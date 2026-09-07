@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../domain/entities/reminder.dart';
 import '../providers/reminder_list_provider.dart';
 import '../../../../core/utils/ui_helpers.dart';
+import '../../../settings/providers/settings_provider.dart';
 
 class ReminderCard extends ConsumerWidget {
   final Reminder reminder;
@@ -30,18 +31,7 @@ class ReminderCard extends ConsumerWidget {
     final categoryIcon = category != null ? getCategoryIcon(category.icon) : Icons.label_rounded;
 
     // Resolve priority color
-    Color priorityColor;
-    switch (reminder.priority) {
-      case Priority.high:
-        priorityColor = theme.colorScheme.error;
-        break;
-      case Priority.medium:
-        priorityColor = Colors.amber;
-        break;
-      case Priority.low:
-        priorityColor = theme.colorScheme.secondary;
-        break;
-    }
+    final priorityColor = getPriorityColor(reminder.priority, theme);
 
     final formattedDate = DateFormat.yMMMd().add_jm().format(reminder.scheduledAt);
     final isOverdue = !reminder.isCompleted && reminder.scheduledAt.isBefore(DateTime.now());
@@ -129,7 +119,7 @@ class ReminderCard extends ConsumerWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: categoryColor.withOpacity(0.12),
+                                color: categoryColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -152,7 +142,7 @@ class ReminderCard extends ConsumerWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: priorityColor.withOpacity(0.12),
+                              color: priorityColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -169,7 +159,7 @@ class ReminderCard extends ConsumerWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.onSurface.withOpacity(0.08),
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -197,7 +187,7 @@ class ReminderCard extends ConsumerWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.12),
+                                color: Colors.orange.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -210,8 +200,10 @@ class ReminderCard extends ConsumerWidget {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'ALARM',
-                                    style: TextStyle(
+                                    reminder.alarmSoundEnabled && reminder.ringtone != null && reminder.ringtone!.isNotEmpty
+                                        ? 'ALARM • ${formatRingtoneName(reminder.ringtone).toUpperCase()}'
+                                        : 'ALARM',
+                                    style: const TextStyle(
                                       color: Colors.orange,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
@@ -267,7 +259,7 @@ class ReminderCard extends ConsumerWidget {
                 // Actions (Delete button)
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded),
-                  color: theme.colorScheme.error.withOpacity(0.8),
+                  color: theme.colorScheme.error.withValues(alpha: 0.8),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () {

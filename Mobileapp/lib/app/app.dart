@@ -31,7 +31,7 @@ class ReminderApp extends ConsumerWidget {
     }
 
     return MaterialApp.router(
-      title: 'Reminder App',
+      title: 'Time Bell',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: AppTheme.getLightTheme(primaryColor),
