@@ -11,8 +11,8 @@ import '../services/notification_service.dart';
 import '../utils/ui_helpers.dart';
 
 class ApiSyncService {
-  // Configured local Wi-Fi IP for XAMPP
-  static const String defaultBaseUrl = 'http://192.168.31.149/reminderapp/api';
+  // Optional user-configured backend API URL (empty by default for 100% offline mode)
+  static const String defaultBaseUrl = '';
 
   static Future<String> getBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -92,6 +92,9 @@ class ApiSyncService {
   static Future<List<Reminder>?> performTwoWaySync() async {
     try {
       final baseUrl = await getBaseUrl();
+      if (baseUrl.trim().isEmpty) {
+        return null;
+      }
       final deviceId = await getDeviceId();
       final db = await SqliteDatabase.instance.database;
 
@@ -268,6 +271,9 @@ class ApiSyncService {
   static Future<void> syncReminders(List<Reminder> reminders) async {
     try {
       final baseUrl = await getBaseUrl();
+      if (baseUrl.trim().isEmpty) {
+        return;
+      }
       final deviceId = await getDeviceId();
 
       final Map<String, dynamic> payload = {

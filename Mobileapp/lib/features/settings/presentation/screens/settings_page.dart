@@ -203,10 +203,13 @@ class SettingsPage extends ConsumerWidget {
               FutureBuilder<String>(
                 future: ApiSyncService.getBaseUrl(),
                 builder: (context, snapshot) {
-                  final currentUrl = snapshot.data ?? ApiSyncService.defaultBaseUrl;
+                  final currentUrl = snapshot.data ?? '';
+                  final displayUrl = currentUrl.isNotEmpty
+                      ? currentUrl
+                      : 'Not configured (Offline mode)';
                   return _SettingsTile(
                     title: 'Server Sync URL',
-                    subtitle: currentUrl,
+                    subtitle: displayUrl,
                     icon: Icons.cloud_sync_outlined,
                     trailing: const Icon(Icons.edit_outlined, size: 20),
                     showDivider: true,
@@ -221,7 +224,7 @@ class SettingsPage extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Enter your backend API URL (local IP or hosted domain):',
+                                'Enter your backend API URL (leave empty for offline mode):',
                                 style: TextStyle(fontSize: 13),
                               ),
                               const SizedBox(height: 12),
@@ -229,7 +232,7 @@ class SettingsPage extends ConsumerWidget {
                                 controller: controller,
                                 decoration: const InputDecoration(
                                   border: OutlineInputBorder(),
-                                  hintText: 'http://192.168.x.x/reminderapp/api',
+                                  hintText: 'https://your-domain.com/api',
                                 ),
                               ),
                             ],
@@ -247,12 +250,18 @@ class SettingsPage extends ConsumerWidget {
                         ),
                       );
 
-                      if (newUrl != null && newUrl.isNotEmpty) {
+                      if (newUrl != null) {
                         await ApiSyncService.setBaseUrl(newUrl);
-                        await ref.read(reminderListNotifierProvider.notifier).syncWithServer();
+                        if (newUrl.isNotEmpty) {
+                          await ref.read(reminderListNotifierProvider.notifier).syncWithServer();
+                        }
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Server URL updated to $newUrl')),
+                            SnackBar(
+                              content: Text(newUrl.isNotEmpty
+                                  ? 'Server URL updated to $newUrl'
+                                  : 'Offline mode active (no remote sync)'),
+                            ),
                           );
                         }
                       }
@@ -891,8 +900,8 @@ class PrivacyPolicyPage extends StatelessWidget {
             ),
             _buildSection(
               theme,
-              '4. Data Storage',
-              'All data collected by Time Bell is stored locally on your device. We do not use cloud storage, nor do we transmit your reminders or tasks to external servers.',
+              '4. Data Storage & Security',
+              'By default, Time Bell operates completely offline. All reminders and preferences are stored locally on your device in a secure SQLite database. We do not transmit your data to external servers or cloud services unless you explicitly configure an optional self-hosted server synchronization URL under Settings.',
             ),
             _buildSection(
               theme,
@@ -901,8 +910,8 @@ class PrivacyPolicyPage extends StatelessWidget {
             ),
             _buildSection(
               theme,
-              '6. Third-Party Services',
-              'We only use essential local packages for scheduling and routing. We do not use third-party analytics, advertising, tracking services, or Firebase.',
+              '6. Third-Party Services & Analytics',
+              'Time Bell does not integrate any third-party tracking, advertising, analytics SDKs, or Firebase services. We do not sell, rent, monetize, or transmit your personal information.',
             ),
             _buildSection(
               theme,

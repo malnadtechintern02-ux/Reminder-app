@@ -46,6 +46,7 @@ class CategoryRepositoryImpl implements CategoryRepository {
   Future<void> syncCategories() async {
     try {
       final baseUrl = await ApiSyncService.getBaseUrl();
+      if (baseUrl.trim().isEmpty) return;
       final response = await http
           .get(Uri.parse('$baseUrl/content.php?type=categories'))
           .timeout(const Duration(seconds: 4));
