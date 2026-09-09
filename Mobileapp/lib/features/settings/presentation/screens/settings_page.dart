@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'dart:convert';
 import '../../../../app/theme/theme_provider.dart';
@@ -9,6 +10,7 @@ import '../../../../app/app.dart';
 import '../../providers/settings_provider.dart';
 import '../../../reminders/presentation/providers/reminder_list_provider.dart';
 import '../../../../core/network/api_sync_service.dart';
+import '../../../../core/services/notification_service.dart';
 
 import 'ringtone_selection_screen.dart';
 
@@ -68,6 +70,20 @@ class SettingsPage extends ConsumerWidget {
                 trailing: SizedBox.shrink(),
               ),
               const _AccentColorPicker(),
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: 56,
+                color: theme.colorScheme.outline.withValues(alpha: 0.1),
+              ),
+              _SettingsTile(
+                title: 'Share App',
+                subtitle: 'Invite friends & family to use Time Bell',
+                icon: Icons.share_rounded,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                onTap: () => _shareApp(context),
+                showDivider: false,
+              ),
             ],
           ),
 
@@ -164,6 +180,22 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.snooze_outlined,
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => _showSnoozeDurationDialog(context, ref, settings.defaultSnoozeDuration),
+                showDivider: true,
+              ),
+              _SettingsTile(
+                title: 'Exact Alarms (Timely Alerts)',
+                subtitle: 'Ensure alarms trigger at the exact minute',
+                icon: Icons.alarm_on_outlined,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                onTap: () => _checkAndRequestExactAlarmPermission(context),
+                showDivider: true,
+              ),
+              _SettingsTile(
+                title: 'Background & Battery Settings',
+                subtitle: 'Prevent Android from putting alarms to sleep',
+                icon: Icons.battery_charging_full_outlined,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                onTap: () => _showBatteryOptimizationDialog(context),
                 showDivider: false,
               ),
             ],
@@ -317,6 +349,14 @@ class SettingsPage extends ConsumerWidget {
                 ),
               ),
               _SettingsTile(
+                title: 'Share App',
+                subtitle: 'Invite friends & family to use Time Bell',
+                icon: Icons.share_rounded,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                onTap: () => _shareApp(context),
+                showDivider: true,
+              ),
+              _SettingsTile(
                 title: 'Rate Time Bell',
                 subtitle: 'Leave a review on Google Play',
                 icon: Icons.star_rate_rounded,
@@ -344,6 +384,120 @@ class SettingsPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _shareApp(BuildContext context) async {
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.reminderapp.reminder_app';
+    const shareMessage = 'Try Timebell – a simple reminder and alarm app.\n\n$playStoreUrl';
+
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+
+      await SharePlus.instance.share(
+        ShareParams(
+          text: shareMessage,
+          subject: 'Timebell - Reminder & Alarm App',
+          sharePositionOrigin: origin,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error launching share sheet: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open share dialog. Please try again.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _checkAndRequestExactAlarmPermission(BuildContext context) async {
+    final canExact = await NotificationService.instance.canScheduleExactAlarms();
+    if (canExact) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Exact alarms are already enabled! Alarms will trigger precisely on time.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Exact Alarm Permission Required'),
+            content: const Text(
+              'Android requires explicit permission for alarms to fire at exact scheduled times when the app is closed.\n\n'
+              'Please allow "Alarms & Reminders" in the next screen.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await NotificationService.instance.requestExactAlarmsPermission();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showBatteryOptimizationDialog(BuildContext context) async {
+    final isIgnored = await NotificationService.instance.isIgnoringBatteryOptimizations();
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                isIgnored ? Icons.check_circle_outline : Icons.battery_alert_outlined,
+                color: isIgnored ? Colors.green : Colors.orange,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Background Alarms')),
+            ],
+          ),
+          content: Text(
+            isIgnored
+                ? 'Battery optimization is already disabled for Time Bell. Your alarms will trigger reliably when the app is closed, minimized, or in the background.\n\nNote: If you manually Force Stop the app from Android Settings, Android disables all background tasks until the app is opened again.'
+                : 'To ensure alarms ring reliably when Time Bell is closed, minimized, or when the screen is locked, allow Time Bell to run in the background without battery restrictions.\n\n'
+                  'Recommended settings in Android:\n'
+                  '• App Battery Usage: "Unrestricted" or "Don\'t optimize"\n'
+                  '• Auto-start / Background Activity: Enabled\n\n'
+                  'Note: Android Force-Stop puts the app in a stopped state until reopened.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Done'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final opened = await NotificationService.instance.openBatteryOptimizationSettings();
+                if (!opened) {
+                  await NotificationService.instance.openAppDetailsSettings();
+                }
+              },
+              child: const Text('Change Settings'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _openPlayStoreRating(BuildContext context) async {

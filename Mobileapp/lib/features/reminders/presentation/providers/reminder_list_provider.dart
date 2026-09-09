@@ -124,6 +124,8 @@ class ReminderListNotifier extends StateNotifier<ReminderListState> {
       state = state.copyWith(isLoading: true);
       final list = await _getReminders();
       state = state.copyWith(reminders: list, isLoading: false);
+      // Synchronize stored alarms with native AlarmManager
+      NotificationService.instance.rescheduleAllActiveReminders(list);
       await syncWithServer();
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
@@ -135,6 +137,7 @@ class ReminderListNotifier extends StateNotifier<ReminderListState> {
       final syncedList = await ApiSyncService.performTwoWaySync();
       if (syncedList != null) {
         state = state.copyWith(reminders: syncedList);
+        NotificationService.instance.rescheduleAllActiveReminders(syncedList);
       }
       _ref.invalidate(categoriesFutureProvider);
       _ref.invalidate(prioritiesFutureProvider);
