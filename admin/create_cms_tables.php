@@ -26,12 +26,12 @@ CREATE TABLE IF NOT EXISTS faqs (
 );
 
 INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES 
-('app_name', 'FocusDay Reminder'),
-('contact_email', 'support@focusday.com'),
+('app_name', 'Time Bell Reminder'),
+('contact_email', 'support@timebell.com'),
 ('contact_phone', '+1234567890');
 
 INSERT IGNORE INTO pages (slug, title, content) VALUES 
-('about', 'About Us', 'Welcome to FocusDay Reminder App.'),
+('about', 'About Us', 'Welcome to Time Bell Reminder App.'),
 ('terms', 'Terms & Conditions', 'These are the terms and conditions.'),
 ('safety', 'Safety Guidelines', 'Please follow these safety guidelines.'),
 ('help', 'Help Center', 'How can we help you?'),

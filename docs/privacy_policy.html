@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Time Bell</title>
+  <style>
+    :root {
+      --primary: #6366F1;
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --text: #1E293B;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #818CF8;
+        --bg: #0F172A;
+        --card-bg: #1E293B;
+        --text: #F1F5F9;
+        --text-muted: #94A3B8;
+        --border: #334155;
+      }
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      padding: 24px 16px;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 36px 32px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 28px;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    .updated {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    h2 {
+      font-size: 20px;
+      margin: 24px 0 10px;
+      color: var(--text);
+    }
+    p {
+      margin-bottom: 14px;
+      color: var(--text);
+    }
+    ul {
+      margin: 10px 0 16px 20px;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 14px;
+    }
+    th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    code {
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--primary);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="badge">Official Policy</div>
+      <h1>Time Bell Privacy Policy</h1>
+      <div class="updated">Last Updated: September 2026 &bull; Time Bell Team</div>
+    </div>
+
+    <p>Time Bell ("we", "our", or "the App") is developed as an offline-first productivity and reminder application designed to help you organize daily tasks, manage recurring schedules, and maintain focus.</p>
+
+    <h2>1. Information We Collect and Store</h2>
+    <p>Time Bell stores your data locally on your device in a private SQLite database:</p>
+    <ul>
+      <li><strong>Reminders & Tasks:</strong> Titles, notes, schedules, categories, priority levels, and completion status.</li>
+      <li><strong>Preferences:</strong> Theme settings, custom accent colors, alarm tones, and snooze durations.</li>
+    </ul>
+    <p>We do not collect names, email addresses, phone numbers, contacts, financial data, or location.</p>
+
+    <h2>2. How Your Information Is Used</h2>
+    <p>Information is used exclusively to deliver the core functionality of Time Bell on your device: to trigger scheduled alerts, display your timeline, and remember your interface customizations.</p>
+
+    <h2>3. Data Storage & Security</h2>
+    <p>All reminder records remain solely on your device. Time Bell does not use cloud sync by default. If you configure a private self-hosted sync server in the app's settings, data is synchronized only with that designated host.</p>
+
+    <h2>4. Device Permissions</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Permission</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>POST_NOTIFICATIONS</code></td>
+          <td>To display reminder alerts and timer completion banners (Android 13+).</td>
+        </tr>
+        <tr>
+          <td><code>SCHEDULE_EXACT_ALARM</code></td>
+          <td>To guarantee reminder alarms ring at the precise scheduled minute.</td>
+        </tr>
+        <tr>
+          <td><code>VIBRATE</code></td>
+          <td>To vibrate the device during reminder alarms when enabled.</td>
+        </tr>
+        <tr>
+          <td><code>RECEIVE_BOOT_COMPLETED</code></td>
+          <td>To reschedule pending reminders if the device is rebooted.</td>
+        </tr>
+        <tr>
+          <td><code>INTERNET</code></td>
+          <td>To open external links (e.g. Play Store rating) or optional private server sync.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>5. Third-Party Services & Tracking</h2>
+    <p>Time Bell contains <strong>no</strong> third-party analytics SDKs, advertising frameworks, or tracking services. We do not sell or monetize user data.</p>
+
+    <h2>6. Children's Privacy</h2>
+    <p>Because no personal data is collected or transmitted to external servers, Time Bell is safe for users of all ages.</p>
+
+    <h2>7. Contact</h2>
+    <p>For questions or privacy inquiries, contact the Time Bell maintainers through the application's project repository or support channel.</p>
+  </div>
+</body>
+</html>

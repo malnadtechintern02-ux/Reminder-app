@@ -5,7 +5,7 @@ header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 $host = 'localhost';
-$dbname = 'focusday_db';
+$dbname = 'timebell_db';
 $user = 'root'; // default XAMPP user
 $pass = ''; // default XAMPP password
 
@@ -14,7 +14,13 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    die(json_encode(["error" => "Database connection failed: " . $e->getMessage()]));
+    try {
+        $pdo = new PDO("mysql:host=$host;dbname=focusday_db;charset=utf8", $user, $pass);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    } catch (PDOException $e2) {
+        die(json_encode(["error" => "Database connection failed: " . $e->getMessage()]));
+    }
 }
 
 function log_admin_action($pdo, $action, $affected_item = null, $admin_id = null) {

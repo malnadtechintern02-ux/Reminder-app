@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS focusday_db;
-USE focusday_db;
+CREATE DATABASE IF NOT EXISTS timebell_db;
+USE timebell_db;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 
 -- Insert a default admin user (password: admin123)
-INSERT INTO users (username, email, password_hash) VALUES ('admin', 'admin@focusday.com', '$2y$10$C8.r/Y.o2tV10UjN6kY2/eK22.i9h2T0Q83g140Xh92i0oT1z0XpC') ON DUPLICATE KEY UPDATE id=id;
+INSERT INTO users (username, email, password_hash) VALUES ('admin', 'admin@timebell.com', '$2y$10$C8.r/Y.o2tV10UjN6kY2/eK22.i9h2T0Q83g140Xh92i0oT1z0XpC') ON DUPLICATE KEY UPDATE id=id;
 
 -- CMS Tables
 
@@ -55,12 +55,12 @@ CREATE TABLE IF NOT EXISTS faqs (
 );
 
 INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES 
-('app_name', 'FocusDay Reminder'),
-('contact_email', 'support@focusday.com'),
+('app_name', 'Time Bell Reminder'),
+('contact_email', 'support@timebell.com'),
 ('contact_phone', '+1234567890');
 
 INSERT IGNORE INTO pages (slug, title, content) VALUES 
-('about', 'About Us', 'Welcome to FocusDay Reminder App.'),
+('about', 'About Us', 'Welcome to Time Bell Reminder App.'),
 ('terms', 'Terms & Conditions', 'These are the terms and conditions.'),
 ('safety', 'Safety Guidelines', 'Please follow these safety guidelines.'),
 ('help', 'Help Center', 'How can we help you?'),

@@ -57,7 +57,7 @@ $users = $pdo->query("
 </head>
 <body>
     <div class="sidebar">
-        <div class="sidebar-header">FocusDay Admin</div>
+        <div class="sidebar-header">Time Bell Admin</div>
         <div class="sidebar-nav">
             <a href="index.php">Dashboard</a>
             <a href="users.php" class="active">Users</a>
