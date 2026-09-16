@@ -8,4 +8,6 @@ class RoutePaths {
   static const String calendar = '/calendar';
   static const String settings = '/settings';
   static const String pomodoro = '/pomodoro';
+  static const String alarm = '/alarm/:id';
+  static const String statistics = '/statistics';
 }

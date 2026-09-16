@@ -21,7 +21,7 @@ class SqliteDatabase {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onConfigure: _onConfigure,
@@ -55,6 +55,19 @@ class SqliteDatabase {
         )
       ''');
     }
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE reminders ADD COLUMN advance_minutes INTEGER NOT NULL DEFAULT 5');
+      await db.execute("ALTER TABLE reminders ADD COLUMN vibration_pattern TEXT NOT NULL DEFAULT 'medium'");
+      await db.execute('ALTER TABLE reminders ADD COLUMN repeat_days TEXT');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+          id TEXT PRIMARY KEY,
+          completed_at TEXT NOT NULL,
+          duration_minutes INTEGER NOT NULL,
+          type TEXT NOT NULL
+        )
+      ''');
+    }
   }
 
   Future _onConfigure(Database db) async {
@@ -82,6 +95,16 @@ class SqliteDatabase {
       )
     ''');
 
+    // Create pomodoro_sessions table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+        id TEXT PRIMARY KEY,
+        completed_at TEXT NOT NULL,
+        duration_minutes INTEGER NOT NULL,
+        type TEXT NOT NULL
+      )
+    ''');
+
     // Create reminders table
     await db.execute('''
       CREATE TABLE reminders (
@@ -102,6 +125,9 @@ class SqliteDatabase {
         snooze_minutes INTEGER NOT NULL DEFAULT 5,
         warning_enabled INTEGER NOT NULL DEFAULT 1 CHECK (warning_enabled IN (0, 1)),
         ringtone TEXT,
+        advance_minutes INTEGER NOT NULL DEFAULT 5,
+        vibration_pattern TEXT NOT NULL DEFAULT 'medium',
+        repeat_days TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
       )
@@ -110,6 +136,7 @@ class SqliteDatabase {
     // Create indexes
     await db.execute('CREATE INDEX idx_reminders_scheduled_at ON reminders (scheduled_at)');
     await db.execute('CREATE INDEX idx_reminders_category_id ON reminders (category_id)');
+    await db.execute('CREATE INDEX idx_pomodoro_completed_at ON pomodoro_sessions (completed_at)');
 
     // Seed default categories
     await _seedDefaultCategories(db);

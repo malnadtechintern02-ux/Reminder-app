@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../categories/domain/entities/category.dart';
+import '../../../categories/presentation/screens/manage_categories_sheet.dart';
 import '../../../../core/utils/ui_helpers.dart';
 
 class CategorySelector extends StatelessWidget {
@@ -21,20 +22,38 @@ class CategorySelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Select Category',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Select Category',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => ManageCategoriesSheet.show(context),
+              icon: const Icon(Icons.tune_rounded, size: 16),
+              label: const Text('Manage', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         SizedBox(
           height: 48,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: categories.length,
+            itemCount: categories.length + 1,
             separatorBuilder: (context, index) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
+              if (index == categories.length) {
+                return ActionChip(
+                  avatar: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('New'),
+                  onPressed: () => ManageCategoriesSheet.show(context),
+                );
+              }
               final category = categories[index];
               final isSelected = category.id == selectedCategoryId;
               final categoryColor = parseHexColor(category.color);

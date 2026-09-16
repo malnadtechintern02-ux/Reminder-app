@@ -46,10 +46,11 @@ void main() {
     final name = ringtones[i];
     final bytes = generateModernRingtonePcmWav(i);
 
+    File('${assetDir.path}/$name.wav').writeAsBytesSync(bytes);
     File('${assetDir.path}/$name.mp3').writeAsBytesSync(bytes);
-    File('${rawDir.path}/$name.mp3').writeAsBytesSync(bytes);
+    File('${rawDir.path}/$name.wav').writeAsBytesSync(bytes);
 
-    print('Generated modern MP3 audio for $name (${bytes.length} bytes)');
+    print('Generated modern WAV audio for $name (${bytes.length} bytes)');
   }
 }
 

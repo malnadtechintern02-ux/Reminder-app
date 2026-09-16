@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/reminder_list_provider.dart';
 import '../../../categories/domain/entities/category.dart';
+import '../../../categories/presentation/screens/manage_categories_sheet.dart';
 import '../widgets/reminder_card.dart';
+import '../widgets/quick_add_sheet.dart';
 import '../../../../app/theme/theme_provider.dart';
 import '../../../../core/utils/ui_helpers.dart';
 
@@ -82,9 +84,20 @@ class _RemindersPageState extends ConsumerState<RemindersPage> with SingleTicker
         centerTitle: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.bolt_rounded, color: Colors.amber),
+            tooltip: 'Quick Add',
+            onPressed: () => QuickAddSheet.show(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.category_outlined),
+            tooltip: 'Categories',
+            onPressed: () => ManageCategoriesSheet.show(context),
+          ),
+          IconButton(
             icon: Icon(
               isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             ),
+            tooltip: 'Toggle Theme',
             onPressed: () {
               ref.read(themeNotifierProvider.notifier).toggleTheme();
             },
@@ -177,9 +190,24 @@ class _RemindersPageState extends ConsumerState<RemindersPage> with SingleTicker
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/reminders/create'),
-        child: const Icon(Icons.add_rounded, size: 30),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'quick_add_fab',
+            backgroundColor: theme.colorScheme.secondaryContainer,
+            foregroundColor: theme.colorScheme.onSecondaryContainer,
+            tooltip: 'Quick Add Reminder',
+            onPressed: () => QuickAddSheet.show(context),
+            child: const Icon(Icons.bolt_rounded, size: 22),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            heroTag: 'main_add_fab',
+            onPressed: () => context.push('/reminders/create'),
+            child: const Icon(Icons.add_rounded, size: 30),
+          ),
+        ],
       ),
     );
   }
@@ -192,9 +220,22 @@ class _RemindersPageState extends ConsumerState<RemindersPage> with SingleTicker
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: categories.length + 1,
+        itemCount: categories.length + 2,
         itemBuilder: (context, index) {
           final isAll = index == 0;
+          final isManage = index == categories.length + 1;
+
+          if (isManage) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ActionChip(
+                avatar: const Icon(Icons.tune_rounded, size: 16),
+                label: const Text('Manage'),
+                onPressed: () => ManageCategoriesSheet.show(context),
+              ),
+            );
+          }
+
           final isSelected = isAll ? selectedId == null : selectedId == categories[index - 1].id;
 
           if (isAll) {

@@ -3,15 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
-
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:convert';
+import 'dart:io';
+
 import '../../../../app/theme/theme_provider.dart';
 import '../../../../app/app.dart';
 import '../../providers/settings_provider.dart';
 import '../../../reminders/presentation/providers/reminder_list_provider.dart';
+import '../../../reminders/domain/entities/reminder.dart';
 import '../../../../core/network/api_sync_service.dart';
 import '../../../../core/services/notification_service.dart';
-
 import 'ringtone_selection_screen.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -110,6 +116,13 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.weekend_outlined,
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => _showDurationDialog(context, ref, 'longBreakDuration', settings.longBreakDuration, [15, 20, 30]),
+              ),
+              _SettingsTile(
+                title: 'Analytics & Insights',
+                subtitle: 'Completion rates, focus trends, and streaks',
+                icon: Icons.insights_rounded,
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => context.push('/statistics'),
                 showDivider: false,
               ),
             ],
@@ -202,14 +215,77 @@ class SettingsPage extends ConsumerWidget {
           ),
 
           _SettingsSection(
+            title: 'Notification & Alarm Tests',
+            children: [
+              _SettingsTile(
+                title: 'Test Notification',
+                subtitle: 'Trigger a sample push alert with sound',
+                icon: Icons.notifications_active_rounded,
+                trailing: const Icon(Icons.play_circle_outline_rounded),
+                onTap: () async {
+                  await NotificationService.instance.testNotification();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Test notification sent! Check your notification shade.')),
+                    );
+                  }
+                },
+              ),
+              _SettingsTile(
+                title: 'Test Advance Warning Alert',
+                subtitle: 'Preview advance upcoming notification',
+                icon: Icons.timer_outlined,
+                trailing: const Icon(Icons.play_circle_outline_rounded),
+                onTap: () async {
+                  await NotificationService.instance.testAdvanceAlert();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Advance alert preview sent!')),
+                    );
+                  }
+                },
+              ),
+              _SettingsTile(
+                title: 'Test Vibration Pattern',
+                subtitle: 'Trigger haptic vibration test',
+                icon: Icons.vibration_rounded,
+                trailing: const Icon(Icons.play_circle_outline_rounded),
+                onTap: () async {
+                  await NotificationService.instance.testVibration(settings.alarmVibrationEnabled ? 'strong' : 'medium');
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Vibration test triggered!')),
+                    );
+                  }
+                },
+              ),
+              _SettingsTile(
+                title: 'Preview Full-Screen Alarm Screen',
+                subtitle: 'Test clock, audio loop, snooze & dismiss UI',
+                icon: Icons.alarm_rounded,
+                trailing: const Icon(Icons.open_in_new_rounded),
+                onTap: () => context.push('/alarm/preview-test-alarm'),
+                showDivider: false,
+              ),
+            ],
+          ),
+
+          _SettingsSection(
             title: 'Data & Storage',
             children: [
               _SettingsTile(
-                title: 'Export Data',
-                subtitle: 'Backup reminders to JSON',
+                title: 'Export Backup (JSON)',
+                subtitle: 'Save or share all reminders to a JSON file',
                 icon: Icons.file_download_outlined,
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => _exportData(context, ref),
+              ),
+              _SettingsTile(
+                title: 'Import Backup (JSON)',
+                subtitle: 'Restore reminders from a JSON file or text',
+                icon: Icons.file_upload_outlined,
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => _importData(context, ref),
               ),
               _SettingsTile(
                 title: 'Clear Completed Tasks',
@@ -654,26 +730,74 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  void _exportData(BuildContext context, WidgetRef ref) {
-    final reminders = ref.read(reminderListNotifierProvider).reminders;
-    final jsonList = reminders.map((r) => {
-      'id': r.id,
-      'title': r.title,
-      'description': r.description,
-      'scheduledAt': r.scheduledAt.toIso8601String(),
-      'endTime': r.endTime?.toIso8601String(),
-      'categoryId': r.categoryId,
-      'priority': r.priority.name,
-      'isCompleted': r.isCompleted,
-      'isRepeating': r.isRepeating,
-      'repeatType': r.repeatType.name,
-      'hasAlarm': r.hasAlarm,
-      'createdAt': r.createdAt.toIso8601String(),
-    }).toList();
-    final jsonString = jsonEncode(jsonList);
-    debugPrint('Exported JSON: $jsonString');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Data exported successfully! (Simulated)')),
+  Future<void> _exportData(BuildContext context, WidgetRef ref) async {
+    try {
+      final reminders = ref.read(reminderListNotifierProvider).reminders;
+      final jsonList = reminders.map((r) => {
+        'id': r.id,
+        'title': r.title,
+        'description': r.description,
+        'scheduledAt': r.scheduledAt.toIso8601String(),
+        'endTime': r.endTime?.toIso8601String(),
+        'categoryId': r.categoryId,
+        'priority': r.priority.name,
+        'isCompleted': r.isCompleted,
+        'isRepeating': r.isRepeating,
+        'repeatType': r.repeatType.name,
+        'repeatDays': r.repeatDays,
+        'hasAlarm': r.hasAlarm,
+        'warningEnabled': r.warningEnabled,
+        'alarmEnabled': r.alarmEnabled,
+        'alarmSoundEnabled': r.alarmSoundEnabled,
+        'alarmVibrationEnabled': r.alarmVibrationEnabled,
+        'snoozeMinutes': r.snoozeMinutes,
+        'ringtone': r.ringtone,
+        'advanceMinutes': r.advanceMinutes,
+        'vibrationPattern': r.vibrationPattern,
+        'createdAt': r.createdAt.toIso8601String(),
+      }).toList();
+
+      final backupData = {
+        'app': 'Timebell',
+        'exported_at': DateTime.now().toIso8601String(),
+        'total_reminders': reminders.length,
+        'reminders': jsonList,
+      };
+
+      final jsonString = const JsonEncoder.withIndent('  ').convert(backupData);
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final file = File('${tempDir.path}/timebell_backup_$timestamp.json');
+      await file.writeAsString(jsonString);
+
+      if (!context.mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
+      final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          subject: 'Timebell Backup ($timestamp)',
+          text: 'Timebell Reminders Backup ($timestamp.json)',
+          sharePositionOrigin: origin,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Export error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e')),
+        );
+      }
+    }
+  }
+
+  void _importData(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ImportBackupSheet(ref: ref),
     );
   }
 
@@ -1141,6 +1265,216 @@ class PrivacyPolicyPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ImportBackupSheet extends StatefulWidget {
+  final WidgetRef ref;
+
+  const _ImportBackupSheet({required this.ref});
+
+  @override
+  State<_ImportBackupSheet> createState() => _ImportBackupSheetState();
+}
+
+class _ImportBackupSheetState extends State<_ImportBackupSheet> {
+  final TextEditingController _pasteController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _processJsonString(String jsonStr) async {
+    setState(() => _isLoading = true);
+    try {
+      final dynamic decoded = jsonDecode(jsonStr);
+      List<dynamic> list;
+      if (decoded is Map && decoded['reminders'] is List) {
+        list = decoded['reminders'];
+      } else if (decoded is List) {
+        list = decoded;
+      } else {
+        throw Exception('Invalid Timebell backup JSON structure.');
+      }
+
+      int imported = 0;
+      final notifier = widget.ref.read(reminderListNotifierProvider.notifier);
+      for (final item in list) {
+        if (item is Map) {
+          try {
+            final map = Map<String, dynamic>.from(item);
+            final reminder = Reminder(
+              id: map['id']?.toString() ?? const Uuid().v4(),
+              title: map['title']?.toString() ?? 'Restored Reminder',
+              description: map['description']?.toString(),
+              scheduledAt: map['scheduledAt'] != null
+                  ? DateTime.parse(map['scheduledAt'])
+                  : (map['scheduled_at'] != null ? DateTime.parse(map['scheduled_at']) : DateTime.now().add(const Duration(hours: 1))),
+              endTime: map['endTime'] != null ? DateTime.parse(map['endTime']) : null,
+              categoryId: map['categoryId']?.toString() ?? map['category_id']?.toString() ?? '1',
+              priority: Priority.fromString(map['priority']?.toString()),
+              isCompleted: map['isCompleted'] == true || map['is_completed'] == 1,
+              isRepeating: map['isRepeating'] == true || map['is_repeating'] == 1,
+              repeatType: map['repeatType'] != null
+                  ? RepeatType.values.firstWhere(
+                      (r) => r.name.toLowerCase() == map['repeatType'].toString().toLowerCase(),
+                      orElse: () => RepeatType.none,
+                    )
+                  : RepeatType.none,
+              repeatDays: map['repeatDays'] is List ? List<int>.from(map['repeatDays']) : null,
+              hasAlarm: map['hasAlarm'] != false,
+              warningEnabled: map['warningEnabled'] != false,
+              alarmEnabled: map['alarmEnabled'] == true,
+              alarmSoundEnabled: map['alarmSoundEnabled'] != false,
+              alarmVibrationEnabled: map['alarmVibrationEnabled'] != false,
+              snoozeMinutes: (map['snoozeMinutes'] as num?)?.toInt() ?? 5,
+              ringtone: map['ringtone']?.toString(),
+              advanceMinutes: (map['advanceMinutes'] as num?)?.toInt() ?? 5,
+              vibrationPattern: map['vibrationPattern']?.toString() ?? 'medium',
+              createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : DateTime.now(),
+            );
+
+            await notifier.saveReminder(reminder);
+            imported++;
+          } catch (itemErr) {
+            debugPrint('Error restoring item: $itemErr');
+          }
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully restored $imported reminders!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Import error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickJsonFile() async {
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (files.isNotEmpty && files.first.path != null) {
+        final file = File(files.first.path!);
+        final content = await file.readAsString();
+        await _processJsonString(content);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('File selection error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(20.0),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.file_upload_rounded, size: 22),
+                  const SizedBox(width: 8),
+                  Text('Restore Reminders (JSON)', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : _pickJsonFile,
+                icon: const Icon(Icons.folder_open_rounded),
+                label: const Text('Pick JSON Backup File'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Text('OR PASTE JSON', style: theme.textTheme.bodySmall),
+                  ),
+                  const Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _pasteController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'Paste raw JSON backup content here...',
+                  filled: true,
+                  fillColor: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton(
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        final text = _pasteController.text.trim();
+                        if (text.isNotEmpty) {
+                          _processJsonString(text);
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.primaryColor,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isLoading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Restore from Pasted Text', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

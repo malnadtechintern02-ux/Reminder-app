@@ -116,5 +116,45 @@ class CategoryRepositoryImpl implements CategoryRepository {
       debugPrint('Failed to sync categories from server: $e');
     }
   }
+
+  @override
+  Future<void> addCategory(Category category) async {
+    final db = await _databaseHelper.database;
+    await db.insert(
+      'categories',
+      {
+        'id': category.id,
+        'name': category.name,
+        'icon': category.icon,
+        'color': category.color,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  @override
+  Future<void> updateCategory(Category category) async {
+    final db = await _databaseHelper.database;
+    await db.update(
+      'categories',
+      {
+        'name': category.name,
+        'icon': category.icon,
+        'color': category.color,
+      },
+      where: 'id = ?',
+      whereArgs: [category.id],
+    );
+  }
+
+  @override
+  Future<void> deleteCategory(String id) async {
+    final db = await _databaseHelper.database;
+    await db.delete(
+      'categories',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 }
 

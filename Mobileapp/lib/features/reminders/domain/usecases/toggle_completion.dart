@@ -16,16 +16,14 @@ class ToggleCompletionUseCase {
       if (isCompleted) {
         await notificationService.cancelNotification(id);
       } else {
-        if (reminder.scheduledAt.isAfter(DateTime.now())) {
-          if (reminder.isRepeating && reminder.repeatType != RepeatType.none) {
-            await notificationService.scheduleRepeatingNotification(
-              reminder: reminder,
-            );
-          } else {
-            await notificationService.scheduleNotification(
-              reminder: reminder,
-            );
-          }
+        if (reminder.isRepeating && reminder.repeatType != RepeatType.none) {
+          await notificationService.scheduleRepeatingNotification(
+            reminder: reminder,
+          );
+        } else if (reminder.scheduledAt.isAfter(DateTime.now().subtract(const Duration(minutes: 1)))) {
+          await notificationService.scheduleNotification(
+            reminder: reminder,
+          );
         }
       }
     }

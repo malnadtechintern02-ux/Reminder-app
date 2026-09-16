@@ -39,6 +39,9 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
   
   bool _isRepeating = false;
   RepeatType _repeatType = RepeatType.none;
+  List<int> _repeatDays = [];
+  int _advanceMinutes = 5;
+  String _vibrationPattern = 'medium';
   bool _hasAlarm = true; // Maps to basic notifications
   bool _warningEnabled = true;
   bool _alarmEnabled = false;
@@ -88,11 +91,14 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
           }
           _isRepeating = reminder.isRepeating;
           _repeatType = reminder.repeatType;
+          _repeatDays = List<int>.from(reminder.repeatDays ?? [reminder.scheduledAt.weekday]);
+          _advanceMinutes = reminder.advanceMinutes;
+          _vibrationPattern = reminder.vibrationPattern;
           _hasAlarm = reminder.hasAlarm;
-          _warningEnabled = reminder.warningEnabled;
+          _warningEnabled = reminder.warningEnabled && reminder.advanceMinutes > 0;
           _alarmEnabled = reminder.alarmEnabled;
           _alarmSoundEnabled = reminder.alarmSoundEnabled;
-          _alarmVibrationEnabled = reminder.alarmVibrationEnabled;
+          _alarmVibrationEnabled = reminder.alarmVibrationEnabled && reminder.vibrationPattern != 'off';
           _snoozeMinutes = reminder.snoozeMinutes;
           _selectedRingtone = reminder.ringtone ?? ref.read(settingsNotifierProvider).defaultRingtone;
         });
@@ -110,10 +116,13 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
         final settings = ref.read(settingsNotifierProvider);
         setState(() {
           _hasAlarm = settings.notificationsEnabled;
-          _warningEnabled = settings.fiveMinuteWarningEnabled;
+          _advanceMinutes = settings.fiveMinuteWarningEnabled ? 5 : 0;
+          _warningEnabled = _advanceMinutes > 0;
           _alarmEnabled = settings.vibrateOnAlarm || settings.alarmSoundEnabled;
           _alarmSoundEnabled = settings.alarmSoundEnabled;
-          _alarmVibrationEnabled = settings.alarmVibrationEnabled;
+          _vibrationPattern = settings.alarmVibrationEnabled ? 'medium' : 'off';
+          _alarmVibrationEnabled = _vibrationPattern != 'off';
+          _repeatDays = [_selectedDate.weekday];
           _snoozeMinutes = settings.defaultSnoozeDuration;
           _selectedRingtone = settings.defaultRingtone;
         });
@@ -245,11 +254,16 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
       isCompleted: false,
       isRepeating: _isRepeating,
       repeatType: _isRepeating ? _repeatType : RepeatType.none,
+      repeatDays: _isRepeating && (_repeatType == RepeatType.weekdays || _repeatType == RepeatType.weekends || _repeatType == RepeatType.custom)
+          ? _repeatDays
+          : null,
+      advanceMinutes: _advanceMinutes,
+      vibrationPattern: _vibrationPattern,
       hasAlarm: _hasAlarm,
-      warningEnabled: _warningEnabled,
+      warningEnabled: _warningEnabled && _advanceMinutes > 0,
       alarmEnabled: _alarmEnabled,
       alarmSoundEnabled: _alarmSoundEnabled,
-      alarmVibrationEnabled: _alarmVibrationEnabled,
+      alarmVibrationEnabled: _alarmVibrationEnabled && _vibrationPattern != 'off',
       snoozeMinutes: _snoozeMinutes,
       ringtone: _selectedRingtone,
       createdAt: _isEdit
@@ -465,15 +479,29 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                 color: theme.cardColor,
                 child: Column(
                   children: [
-                    SwitchListTile(
-                      title: const Text('5-Minute Warning', style: TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: const Text('Notify me 5 mins before'),
-                      value: _warningEnabled,
-                      onChanged: (val) {
-                        setState(() {
-                          _warningEnabled = val;
-                        });
-                      },
+                    ListTile(
+                      leading: Icon(Icons.access_alarm_rounded, color: theme.colorScheme.primary),
+                      title: const Text('Advance Notification', style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(_advanceMinutes == 0 ? 'Off (No advance alert)' : 'Alert $_advanceMinutes minutes before'),
+                      trailing: DropdownButton<int>(
+                        value: _advanceMinutes,
+                        underline: const SizedBox(),
+                        items: const [
+                          DropdownMenuItem(value: 0, child: Text('Off')),
+                          DropdownMenuItem(value: 5, child: Text('5m before')),
+                          DropdownMenuItem(value: 10, child: Text('10m before')),
+                          DropdownMenuItem(value: 15, child: Text('15m before')),
+                          DropdownMenuItem(value: 30, child: Text('30m before')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _advanceMinutes = val;
+                              _warningEnabled = val > 0;
+                            });
+                          }
+                        },
+                      ),
                     ),
                     const Divider(height: 1),
                     SwitchListTile(
@@ -534,17 +562,34 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                         },
                       ),
                       const Divider(height: 1),
-                      SwitchListTile(
-                        title: const Text('Vibration'),
-                        value: _alarmVibrationEnabled,
-                        onChanged: (val) {
-                          setState(() {
-                            _alarmVibrationEnabled = val;
-                          });
-                        },
-                      ),
                       ListTile(
-                        title: const Text('Snooze Duration'),
+                        leading: Icon(Icons.vibration_rounded, color: theme.colorScheme.primary),
+                        title: const Text('Vibration Pattern', style: TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text('Pattern: ${_vibrationPattern.toUpperCase()}'),
+                        trailing: DropdownButton<String>(
+                          value: _vibrationPattern,
+                          underline: const SizedBox(),
+                          items: const [
+                            DropdownMenuItem(value: 'off', child: Text('Off')),
+                            DropdownMenuItem(value: 'short', child: Text('Short')),
+                            DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                            DropdownMenuItem(value: 'long', child: Text('Long')),
+                            DropdownMenuItem(value: 'strong', child: Text('Strong')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _vibrationPattern = val;
+                                _alarmVibrationEnabled = val != 'off';
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: Icon(Icons.snooze_rounded, color: theme.colorScheme.primary),
+                        title: const Text('Default Snooze Duration', style: TextStyle(fontWeight: FontWeight.w600)),
                         trailing: DropdownButton<int>(
                           value: _snoozeMinutes,
                           underline: const SizedBox(),
@@ -575,6 +620,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
@@ -600,17 +646,88 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                           ),
                           items: const [
                             DropdownMenuItem(value: RepeatType.daily, child: Text('Every Day')),
+                            DropdownMenuItem(value: RepeatType.weekdays, child: Text('Weekdays (Mon - Fri)')),
+                            DropdownMenuItem(value: RepeatType.weekends, child: Text('Weekends (Sat - Sun)')),
                             DropdownMenuItem(value: RepeatType.weekly, child: Text('Every Week')),
                             DropdownMenuItem(value: RepeatType.monthly, child: Text('Every Month')),
+                            DropdownMenuItem(value: RepeatType.custom, child: Text('Custom Days')),
                           ],
                           onChanged: (val) {
                             if (val != null) {
                               setState(() {
                                 _repeatType = val;
+                                if (_repeatType == RepeatType.custom && _repeatDays.isEmpty) {
+                                  _repeatDays = [_selectedDate.weekday];
+                                }
                               });
                             }
                           },
                         ),
+                        if (_repeatType == RepeatType.custom) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Repeat On Days:',
+                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              {'day': 1, 'label': 'Mon'},
+                              {'day': 2, 'label': 'Tue'},
+                              {'day': 3, 'label': 'Wed'},
+                              {'day': 4, 'label': 'Thu'},
+                              {'day': 5, 'label': 'Fri'},
+                              {'day': 6, 'label': 'Sat'},
+                              {'day': 7, 'label': 'Sun'},
+                            ].map((item) {
+                              final day = item['day'] as int;
+                              final label = item['label'] as String;
+                              final isSelected = _repeatDays.contains(day);
+                              return InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    if (isSelected) {
+                                      if (_repeatDays.length > 1) {
+                                        _repeatDays.remove(day);
+                                      }
+                                    } else {
+                                      _repeatDays.add(day);
+                                      _repeatDays.sort();
+                                    }
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  width: 42,
+                                  height: 38,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? theme.primaryColor
+                                        : theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? theme.primaryColor
+                                          : theme.colorScheme.outline.withValues(alpha: 0.2),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : theme.textTheme.bodyMedium?.color,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                       ]
                     ],
                   ),

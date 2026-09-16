@@ -71,14 +71,37 @@ class Priority {
 enum RepeatType {
   none,
   daily,
+  weekdays,
+  weekends,
   weekly,
-  monthly;
+  monthly,
+  custom;
 
   static RepeatType fromString(String value) {
+    final clean = value.toLowerCase().trim();
     return RepeatType.values.firstWhere(
-      (e) => e.name == value.toLowerCase(),
+      (e) => e.name == clean,
       orElse: () => RepeatType.none,
     );
+  }
+
+  String get displayName {
+    switch (this) {
+      case RepeatType.none:
+        return 'Once';
+      case RepeatType.daily:
+        return 'Every day';
+      case RepeatType.weekdays:
+        return 'Weekdays (Mon-Fri)';
+      case RepeatType.weekends:
+        return 'Weekends (Sat-Sun)';
+      case RepeatType.weekly:
+        return 'Weekly';
+      case RepeatType.monthly:
+        return 'Monthly';
+      case RepeatType.custom:
+        return 'Custom days';
+    }
   }
 }
 
@@ -93,11 +116,14 @@ class Reminder {
   final bool isCompleted;
   final bool isRepeating;
   final RepeatType repeatType;
+  final List<int>? repeatDays; // 1 = Monday, ..., 7 = Sunday
   final bool hasAlarm;
   final bool alarmEnabled;
   final bool alarmSoundEnabled;
   final bool alarmVibrationEnabled;
+  final String vibrationPattern; // 'off', 'short', 'medium', 'long', 'strong'
   final int snoozeMinutes;
+  final int advanceMinutes; // 0 = Off, 5, 10, 15, 30
   final bool warningEnabled;
   final String? ringtone;
   final DateTime createdAt;
@@ -113,11 +139,14 @@ class Reminder {
     required this.isCompleted,
     required this.isRepeating,
     required this.repeatType,
+    this.repeatDays,
     required this.hasAlarm,
     required this.alarmEnabled,
     required this.alarmSoundEnabled,
     required this.alarmVibrationEnabled,
+    this.vibrationPattern = 'medium',
     required this.snoozeMinutes,
+    this.advanceMinutes = 5,
     required this.warningEnabled,
     this.ringtone,
     required this.createdAt,
@@ -134,15 +163,19 @@ class Reminder {
     bool? isCompleted,
     bool? isRepeating,
     RepeatType? repeatType,
+    List<int>? repeatDays,
     bool? hasAlarm,
     bool? alarmEnabled,
     bool? alarmSoundEnabled,
     bool? alarmVibrationEnabled,
+    String? vibrationPattern,
     int? snoozeMinutes,
+    int? advanceMinutes,
     bool? warningEnabled,
     String? ringtone,
     DateTime? createdAt,
   }) {
+    final newAdvanceMinutes = advanceMinutes ?? this.advanceMinutes;
     return Reminder(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -154,12 +187,15 @@ class Reminder {
       isCompleted: isCompleted ?? this.isCompleted,
       isRepeating: isRepeating ?? this.isRepeating,
       repeatType: repeatType ?? this.repeatType,
+      repeatDays: repeatDays ?? this.repeatDays,
       hasAlarm: hasAlarm ?? this.hasAlarm,
       alarmEnabled: alarmEnabled ?? this.alarmEnabled,
       alarmSoundEnabled: alarmSoundEnabled ?? this.alarmSoundEnabled,
       alarmVibrationEnabled: alarmVibrationEnabled ?? this.alarmVibrationEnabled,
+      vibrationPattern: vibrationPattern ?? this.vibrationPattern,
       snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
-      warningEnabled: warningEnabled ?? this.warningEnabled,
+      advanceMinutes: newAdvanceMinutes,
+      warningEnabled: warningEnabled ?? (newAdvanceMinutes > 0),
       ringtone: ringtone ?? this.ringtone,
       createdAt: createdAt ?? this.createdAt,
     );

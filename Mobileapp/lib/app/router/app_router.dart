@@ -10,6 +10,8 @@ import '../../features/reminders/presentation/screens/schedule_page.dart';
 import '../../features/settings/presentation/screens/settings_page.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import '../../features/pomodoro/presentation/screens/pomodoro_page.dart';
+import '../../features/reminders/presentation/screens/alarm_screen.dart';
+import '../../features/statistics/presentation/screens/statistics_page.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -22,6 +24,21 @@ final GoRouter appRouter = GoRouter(
       path: RoutePaths.splash,
       name: RouteNames.splash,
       builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: RoutePaths.alarm,
+      name: RouteNames.alarm,
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final id = state.pathParameters['id'] ?? '';
+        return AlarmScreen(reminderId: id);
+      },
+    ),
+    GoRoute(
+      path: RoutePaths.statistics,
+      name: RouteNames.statistics,
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const StatisticsPage(),
     ),
     StatefulShellRoute.indexedStack(
       builder: (BuildContext context, GoRouterState state,

@@ -120,7 +120,11 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
           }
         }
       } else {
-        await _audioPlayer.play(AssetSource('sounds/$ringtoneId.mp3'));
+        try {
+          await _audioPlayer.play(AssetSource('sounds/$ringtoneId.wav'));
+        } catch (_) {
+          await _audioPlayer.play(AssetSource('sounds/$ringtoneId.mp3'));
+        }
       }
 
       if (mounted) {
@@ -131,19 +135,6 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
       }
     } catch (e) {
       debugPrint('Error playing sound ($ringtoneId): $e');
-      // Try fallback to wav if mp3 failed
-      if (!isCustom) {
-        try {
-          await _audioPlayer.play(AssetSource('sounds/$ringtoneId.wav'));
-          if (mounted) {
-            setState(() {
-              _currentlyPlaying = ringtoneId;
-              _loadingId = null;
-            });
-          }
-          return;
-        } catch (_) {}
-      }
 
       if (mounted) {
         setState(() {
@@ -424,11 +415,13 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
                   child: ElevatedButton.icon(
                     onPressed: () => _confirmAndPop(currentSelected),
                     icon: const Icon(Icons.check_circle_rounded),
-                    label: Text(
-                      'Use "${formatRingtoneName(currentSelected)}"',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    label: Flexible(
+                      child: Text(
+                        'Use "${formatRingtoneName(currentSelected)}"',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),

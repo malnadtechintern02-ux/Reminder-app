@@ -261,15 +261,114 @@ class ReminderCard extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Actions (Delete button)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  color: theme.colorScheme.error.withValues(alpha: 0.8),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () {
-                    _showDeleteDialog(context, ref);
-                  },
+                // Actions Column (Quick Alarm Toggle & More Menu)
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Quick Alarm Toggle
+                    IconButton(
+                      icon: Icon(
+                        reminder.alarmEnabled
+                            ? Icons.notifications_active_rounded
+                            : Icons.notifications_off_outlined,
+                        color: reminder.alarmEnabled
+                            ? Colors.amber.shade700
+                            : theme.disabledColor,
+                        size: 22,
+                      ),
+                      tooltip: reminder.alarmEnabled ? 'Alarm is ON (Tap to turn OFF)' : 'Alarm is OFF (Tap to turn ON)',
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        ref.read(reminderListNotifierProvider.notifier).toggleAlarmEnabled(reminder.id, !reminder.alarmEnabled);
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(reminder.alarmEnabled ? 'Alarm disabled for "${reminder.title}"' : 'Alarm enabled for "${reminder.title}"'),
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    // More options popup menu
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        size: 20,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      onSelected: (action) {
+                        switch (action) {
+                          case 'edit':
+                            context.push('/reminders/edit/${reminder.id}');
+                            break;
+                          case 'duplicate':
+                            ref.read(reminderListNotifierProvider.notifier).duplicateReminder(reminder);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Reminder duplicated (+1 hour)'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            break;
+                          case 'test_alarm':
+                            context.push('/alarm/${reminder.id}');
+                            break;
+                          case 'delete':
+                            _showDeleteDialog(context, ref);
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 18),
+                              SizedBox(width: 10),
+                              Text('Edit'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'duplicate',
+                          child: Row(
+                            children: [
+                              Icon(Icons.copy_rounded, size: 18),
+                              SizedBox(width: 10),
+                              Text('Duplicate'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'test_alarm',
+                          child: Row(
+                            children: [
+                              Icon(Icons.alarm_on_rounded, size: 18, color: Colors.orange),
+                              SizedBox(width: 10),
+                              Text('Test Alarm Screen'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded, size: 18, color: theme.colorScheme.error),
+                              const SizedBox(width: 10),
+                              Text('Delete', style: TextStyle(color: theme.colorScheme.error)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),

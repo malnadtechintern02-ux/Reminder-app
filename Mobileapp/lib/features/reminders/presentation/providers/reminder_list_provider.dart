@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../domain/entities/reminder.dart';
 import '../../domain/repositories/reminder_repository.dart';
 import '../../data/repositories/reminder_repository_impl.dart';
@@ -205,6 +206,33 @@ class ReminderListNotifier extends StateNotifier<ReminderListState> {
       await loadReminders();
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
+    }
+  }
+
+  Future<void> duplicateReminder(Reminder reminder) async {
+    final newId = const Uuid().v4();
+    final newScheduledAt = reminder.scheduledAt.isBefore(DateTime.now())
+        ? DateTime.now().add(const Duration(hours: 1))
+        : reminder.scheduledAt.add(const Duration(hours: 1));
+
+    final duplicated = reminder.copyWith(
+      id: newId,
+      title: '${reminder.title} (Copy)',
+      scheduledAt: newScheduledAt,
+      isCompleted: false,
+      createdAt: DateTime.now(),
+    );
+    await saveReminder(duplicated);
+  }
+
+  Future<void> toggleAlarmEnabled(String id, bool enabled) async {
+    final index = state.reminders.indexWhere((r) => r.id == id);
+    if (index >= 0) {
+      final updated = state.reminders[index].copyWith(
+        alarmEnabled: enabled,
+        hasAlarm: enabled,
+      );
+      await saveReminder(updated);
     }
   }
 

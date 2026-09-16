@@ -30,13 +30,23 @@ class NotificationService {
   static const MethodChannel _settingsChannel =
       MethodChannel('com.reminderapp.reminder_app/settings');
 
+  /// Callback triggered when an alarm notification or full-screen intent is opened
+  static void Function(String reminderId)? onAlarmTriggered;
+
   NotificationService._init();
 
   Future<void> init() async {
-    // Initialize timezone
+    // Initialize timezone with safe fallback
     tz.initializeTimeZones();
-    final timeZoneName = (await FlutterTimezone.getLocalTimezone()).identifier;
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    try {
+      final timeZoneName = (await FlutterTimezone.getLocalTimezone()).identifier;
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+    } catch (e) {
+      debugPrint('Warning: Timezone initialization failed, falling back: $e');
+      try {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      } catch (_) {}
+    }
 
     const fln.AndroidInitializationSettings initializationSettingsAndroid =
         fln.AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -56,7 +66,11 @@ class NotificationService {
     await _localNotifications.initialize(
       settings: initializationSettings,
       onDidReceiveNotificationResponse: (fln.NotificationResponse response) {
-        // Handle notification click if needed
+        final payload = response.payload;
+        if (payload != null && payload.startsWith('reminder_alarm:')) {
+          final id = payload.substring('reminder_alarm:'.length);
+          onAlarmTriggered?.call(id);
+        }
       },
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
@@ -78,14 +92,15 @@ class NotificationService {
       // Main high-priority alarm channel configured with Alarm audio attributes
       await androidPlugin.createNotificationChannel(
         const fln.AndroidNotificationChannel(
-          'alarm_channel_v2',
-          'Reminder Alarms',
+          'alarm_channel_v5_morning_breeze',
+          'Reminder Alarms (Default)',
           description: 'Exact time reminder alarms',
           importance: fln.Importance.max,
           playSound: true,
           enableVibration: true,
           enableLights: true,
           audioAttributesUsage: fln.AudioAttributesUsage.alarm,
+          sound: fln.RawResourceAndroidNotificationSound('morning_breeze'),
         ),
       );
 
@@ -211,13 +226,44 @@ class NotificationService {
         : fln.AndroidScheduleMode.exactAllowWhileIdle;
   }
 
+  Int64List? _getVibrationPattern(String? pattern) {
+    if (pattern == null || pattern == 'medium') {
+      return Int64List.fromList([0, 500, 500, 500]);
+    }
+    switch (pattern) {
+      case 'off':
+        return null;
+      case 'short':
+        return Int64List.fromList([0, 200, 200, 200]);
+      case 'medium':
+        return Int64List.fromList([0, 500, 500, 500]);
+      case 'long':
+        return Int64List.fromList([0, 1000, 500, 1000]);
+      case 'strong':
+        return Int64List.fromList([0, 800, 200, 800, 200, 800, 200, 800]);
+      default:
+        return Int64List.fromList([0, 500, 500, 500]);
+    }
+  }
+
   int _getNotificationId(String uuid) {
     int hash = 5381;
     for (int i = 0; i < uuid.length; i++) {
       hash = ((hash << 5) + hash) + uuid.codeUnitAt(i);
-      hash = hash & 0x7FFFFFFF;
+      // Mask to 26 bits (0x03FFFFFF) so that notificationId * 16 + 15
+      // stays well within signed 32-bit Integer.MAX_VALUE (2,147,483,647).
+      hash = hash & 0x03FFFFFF;
     }
     return hash;
+  }
+
+  tz.TZDateTime _nextInstanceOfWeekdayAndTime(int weekday, int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+    tz.TZDateTime scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    while (scheduledDate.weekday != weekday || scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+    return scheduledDate;
   }
 
   Future<void> scheduleNotification({
@@ -230,36 +276,67 @@ class NotificationService {
     final warningScheduleMode = await _determineScheduleMode(isAlarm: false);
 
     // --------------------------------------------------------
-    // 5 MINUTE WARNING
+    // ADVANCE WARNING NOTIFICATION (OFF, 5m, 10m, 15m, 30m)
     // --------------------------------------------------------
-    final fiveMinutesBefore = tzScheduledDate.subtract(const Duration(minutes: 5));
-
+    final advanceMinutes = reminder.advanceMinutes;
     try {
-      if (reminder.warningEnabled) {
-        if (fiveMinutesBefore.isAfter(now)) {
-          await _localNotifications.zonedSchedule(
-            id: notificationId * 2,
-            title: '⏰ Upcoming Reminder',
-            body: '${reminder.title} starts in 5 minutes',
-            scheduledDate: fiveMinutesBefore,
-            notificationDetails: _getWarningNotificationDetails(reminder),
-            androidScheduleMode: warningScheduleMode,
-            payload: 'reminder_warning',
-          );
+      if (reminder.warningEnabled && advanceMinutes > 0) {
+        final advanceTime = tzScheduledDate.subtract(Duration(minutes: advanceMinutes));
+        if (advanceTime.isAfter(now)) {
+          final warningPayload = 'reminder_warning:${reminder.id}';
+          final warningDetails = _getWarningNotificationDetails(reminder);
+          final warningTitle = '⏰ Upcoming Reminder';
+          final warningBody = '${reminder.title} starts in $advanceMinutes minutes';
+          try {
+            await _localNotifications.zonedSchedule(
+              id: notificationId * 16,
+              title: warningTitle,
+              body: warningBody,
+              scheduledDate: advanceTime,
+              notificationDetails: warningDetails,
+              androidScheduleMode: warningScheduleMode,
+              payload: warningPayload,
+            );
+          } catch (e) {
+            await _localNotifications.zonedSchedule(
+              id: notificationId * 16,
+              title: warningTitle,
+              body: warningBody,
+              scheduledDate: advanceTime,
+              notificationDetails: warningDetails,
+              androidScheduleMode: fln.AndroidScheduleMode.inexactAllowWhileIdle,
+              payload: warningPayload,
+            );
+          }
         } else if (tzScheduledDate.isAfter(now) && tzScheduledDate.difference(now).inSeconds > 10) {
-          // If reminder is scheduled within the next 5 minutes, deliver an immediate warning
           final minsLeft = tzScheduledDate.difference(now).inMinutes;
-          await _localNotifications.zonedSchedule(
-            id: notificationId * 2,
-            title: '⏰ Upcoming Reminder',
-            body: minsLeft <= 1
-                ? '${reminder.title} starts very soon'
-                : '${reminder.title} starts in $minsLeft minutes',
-            scheduledDate: now.add(const Duration(seconds: 2)),
-            notificationDetails: _getWarningNotificationDetails(reminder),
-            androidScheduleMode: warningScheduleMode,
-            payload: 'reminder_warning',
-          );
+          final warningPayload = 'reminder_warning:${reminder.id}';
+          final warningDetails = _getWarningNotificationDetails(reminder);
+          final warningTitle = '⏰ Upcoming Reminder';
+          final warningBody = minsLeft <= 1
+              ? '${reminder.title} starts very soon'
+              : '${reminder.title} starts in $minsLeft minutes';
+          try {
+            await _localNotifications.zonedSchedule(
+              id: notificationId * 16,
+              title: warningTitle,
+              body: warningBody,
+              scheduledDate: now.add(const Duration(seconds: 2)),
+              notificationDetails: warningDetails,
+              androidScheduleMode: warningScheduleMode,
+              payload: warningPayload,
+            );
+          } catch (e) {
+            await _localNotifications.zonedSchedule(
+              id: notificationId * 16,
+              title: warningTitle,
+              body: warningBody,
+              scheduledDate: now.add(const Duration(seconds: 2)),
+              notificationDetails: warningDetails,
+              androidScheduleMode: fln.AndroidScheduleMode.inexactAllowWhileIdle,
+              payload: warningPayload,
+            );
+          }
         }
       }
 
@@ -281,17 +358,49 @@ class NotificationService {
 
         if (targetAlarmTime.isAfter(now)) {
           final details = await _getAlarmNotificationDetails(reminder);
-          await _localNotifications.zonedSchedule(
-            id: notificationId * 2 + 1,
-            title: '🚨 ${reminder.title}',
-            body: reminder.description?.isNotEmpty == true
-                ? reminder.description!
-                : 'Alarm time reached for ${reminder.title}',
-            scheduledDate: targetAlarmTime,
-            notificationDetails: details,
-            androidScheduleMode: exactAlarmScheduleMode,
-            payload: 'reminder_alarm',
-          );
+          final alarmPayload = 'reminder_alarm:${reminder.id}';
+          final alarmTitle = '🚨 ${reminder.title}';
+          final alarmBody = reminder.description?.isNotEmpty == true
+              ? reminder.description!
+              : 'Alarm time reached for ${reminder.title}';
+
+          try {
+            await _localNotifications.zonedSchedule(
+              id: notificationId * 16 + 1,
+              title: alarmTitle,
+              body: alarmBody,
+              scheduledDate: targetAlarmTime,
+              notificationDetails: details,
+              androidScheduleMode: exactAlarmScheduleMode,
+              payload: alarmPayload,
+            );
+          } catch (e) {
+            debugPrint('Failed to schedule with $exactAlarmScheduleMode, falling back: $e');
+            try {
+              // First fallback: exactAllowWhileIdle
+              await _localNotifications.zonedSchedule(
+                id: notificationId * 16 + 1,
+                title: alarmTitle,
+                body: alarmBody,
+                scheduledDate: targetAlarmTime,
+                notificationDetails: details,
+                androidScheduleMode: fln.AndroidScheduleMode.exactAllowWhileIdle,
+                payload: alarmPayload,
+              );
+            } catch (e2) {
+              // Second fallback: inexactAllowWhileIdle
+              debugPrint('Failed exactAllowWhileIdle, falling back to inexactAllowWhileIdle: $e2');
+              await _localNotifications.zonedSchedule(
+                id: notificationId * 16 + 1,
+                title: alarmTitle,
+                body: alarmBody,
+                scheduledDate: targetAlarmTime,
+                notificationDetails: details,
+                androidScheduleMode: fln.AndroidScheduleMode.inexactAllowWhileIdle,
+                payload: alarmPayload,
+              );
+            }
+          }
         }
       }
     } catch (e) {
@@ -306,70 +415,173 @@ class NotificationService {
     final now = tz.TZDateTime.now(tz.local);
     tz.TZDateTime scheduledDate = tz.TZDateTime.from(reminder.scheduledAt, tz.local);
 
-    // Calculate future date if original scheduled date is in the past
-    while (scheduledDate.isBefore(now)) {
-      if (reminder.repeatType.name == 'daily') {
-        scheduledDate = scheduledDate.add(const Duration(days: 1));
-      } else if (reminder.repeatType.name == 'weekly') {
-        scheduledDate = scheduledDate.add(const Duration(days: 7));
-      } else if (reminder.repeatType.name == 'monthly') {
-        scheduledDate = tz.TZDateTime(
-          tz.local,
-          scheduledDate.year,
-          scheduledDate.month + 1,
-          scheduledDate.day,
-          scheduledDate.hour,
-          scheduledDate.minute,
-          scheduledDate.second,
-        );
-      } else {
-        break;
-      }
-    }
+    final canExact = await canScheduleExactAlarms();
+    final repeatingScheduleMode = canExact
+        ? fln.AndroidScheduleMode.exactAllowWhileIdle
+        : fln.AndroidScheduleMode.inexactAllowWhileIdle;
 
-    fln.DateTimeComponents? matchComponents;
-    if (reminder.repeatType.name == 'daily') {
-      matchComponents = fln.DateTimeComponents.time;
-    } else if (reminder.repeatType.name == 'weekly') {
-      matchComponents = fln.DateTimeComponents.dayOfWeekAndTime;
-    } else if (reminder.repeatType.name == 'monthly') {
-      matchComponents = fln.DateTimeComponents.dayOfMonthAndTime;
-    }
-
-    final exactAlarmScheduleMode = await _determineScheduleMode(isAlarm: true);
-    final warningScheduleMode = await _determineScheduleMode(isAlarm: false);
+    final advanceMinutes = reminder.advanceMinutes;
 
     try {
-      if (reminder.warningEnabled) {
-        final warningDate = scheduledDate.subtract(const Duration(minutes: 5));
-        if (warningDate.isAfter(now)) {
-          await _localNotifications.zonedSchedule(
-            id: notificationId * 2,
-            title: '⏰ Upcoming Reminder',
-            body: '${reminder.title} starts in 5 minutes',
-            scheduledDate: warningDate,
-            notificationDetails: _getWarningNotificationDetails(reminder),
-            androidScheduleMode: warningScheduleMode,
-            matchDateTimeComponents: matchComponents,
-            payload: 'reminder_warning',
+      // Multi-day repeats (Weekdays, Weekends, Custom days)
+      if (reminder.repeatType == RepeatType.weekdays ||
+          reminder.repeatType == RepeatType.weekends ||
+          reminder.repeatType == RepeatType.custom) {
+        List<int> targetDays;
+        if (reminder.repeatType == RepeatType.weekdays) {
+          targetDays = const [1, 2, 3, 4, 5]; // Mon - Fri
+        } else if (reminder.repeatType == RepeatType.weekends) {
+          targetDays = const [6, 7]; // Sat - Sun
+        } else {
+          targetDays = (reminder.repeatDays != null && reminder.repeatDays!.isNotEmpty)
+              ? reminder.repeatDays!
+              : [reminder.scheduledAt.weekday];
+        }
+
+        for (final day in targetDays) {
+          final instance = _nextInstanceOfWeekdayAndTime(
+            day,
+            reminder.scheduledAt.hour,
+            reminder.scheduledAt.minute,
           );
+
+          // Advance warning for this day
+          if (reminder.warningEnabled && advanceMinutes > 0) {
+            final warnInstance = instance.subtract(Duration(minutes: advanceMinutes));
+            final warningPayload = 'reminder_warning:${reminder.id}';
+            final warningDetails = _getWarningNotificationDetails(reminder);
+            try {
+              await _localNotifications.zonedSchedule(
+                id: notificationId * 16 + day * 2,
+                title: '⏰ Upcoming Reminder',
+                body: '${reminder.title} starts in $advanceMinutes minutes',
+                scheduledDate: warnInstance,
+                notificationDetails: warningDetails,
+                androidScheduleMode: repeatingScheduleMode,
+                matchDateTimeComponents: fln.DateTimeComponents.dayOfWeekAndTime,
+                payload: warningPayload,
+              );
+            } catch (_) {}
+          }
+
+          // Exact alarm for this day
+          if (reminder.alarmEnabled || reminder.hasAlarm) {
+            final details = await _getAlarmNotificationDetails(reminder);
+            final alarmPayload = 'reminder_recurring:${reminder.id}';
+            try {
+              await _localNotifications.zonedSchedule(
+                id: notificationId * 16 + day * 2 + 1,
+                title: '🚨 ${reminder.title}',
+                body: reminder.description?.isNotEmpty == true
+                    ? reminder.description!
+                    : 'Recurring alarm for ${reminder.title}',
+                scheduledDate: instance,
+                notificationDetails: details,
+                androidScheduleMode: repeatingScheduleMode,
+                matchDateTimeComponents: fln.DateTimeComponents.dayOfWeekAndTime,
+                payload: alarmPayload,
+              );
+            } catch (e) {
+              debugPrint('Failed scheduling repeat for weekday $day: $e');
+            }
+          }
+        }
+        return;
+      }
+
+      // Single component repeats (Daily, Weekly, Monthly)
+      while (scheduledDate.isBefore(now)) {
+        if (reminder.repeatType == RepeatType.daily) {
+          scheduledDate = scheduledDate.add(const Duration(days: 1));
+        } else if (reminder.repeatType == RepeatType.weekly) {
+          scheduledDate = scheduledDate.add(const Duration(days: 7));
+        } else if (reminder.repeatType == RepeatType.monthly) {
+          scheduledDate = tz.TZDateTime(
+            tz.local,
+            scheduledDate.year,
+            scheduledDate.month + 1,
+            scheduledDate.day,
+            scheduledDate.hour,
+            scheduledDate.minute,
+            scheduledDate.second,
+          );
+        } else {
+          break;
+        }
+      }
+
+      fln.DateTimeComponents? matchComponents;
+      if (reminder.repeatType == RepeatType.daily) {
+        matchComponents = fln.DateTimeComponents.time;
+      } else if (reminder.repeatType == RepeatType.weekly) {
+        matchComponents = fln.DateTimeComponents.dayOfWeekAndTime;
+      } else if (reminder.repeatType == RepeatType.monthly) {
+        matchComponents = fln.DateTimeComponents.dayOfMonthAndTime;
+      }
+
+      if (reminder.warningEnabled && advanceMinutes > 0) {
+        final warningDate = scheduledDate.subtract(Duration(minutes: advanceMinutes));
+        if (warningDate.isAfter(now)) {
+          final warningPayload = 'reminder_warning:${reminder.id}';
+          final warningDetails = _getWarningNotificationDetails(reminder);
+          try {
+            await _localNotifications.zonedSchedule(
+              id: notificationId * 16,
+              title: '⏰ Upcoming Reminder',
+              body: '${reminder.title} starts in $advanceMinutes minutes',
+              scheduledDate: warningDate,
+              notificationDetails: warningDetails,
+              androidScheduleMode: repeatingScheduleMode,
+              matchDateTimeComponents: matchComponents,
+              payload: warningPayload,
+            );
+          } catch (e) {
+            await _localNotifications.zonedSchedule(
+              id: notificationId * 16,
+              title: '⏰ Upcoming Reminder',
+              body: '${reminder.title} starts in $advanceMinutes minutes',
+              scheduledDate: warningDate,
+              notificationDetails: warningDetails,
+              androidScheduleMode: fln.AndroidScheduleMode.inexactAllowWhileIdle,
+              matchDateTimeComponents: matchComponents,
+              payload: warningPayload,
+            );
+          }
         }
       }
 
       if (reminder.alarmEnabled || reminder.hasAlarm) {
         final details = await _getAlarmNotificationDetails(reminder);
-        await _localNotifications.zonedSchedule(
-          id: notificationId * 2 + 1,
-          title: '🚨 ${reminder.title}',
-          body: reminder.description?.isNotEmpty == true
-              ? reminder.description!
-              : 'Recurring alarm for ${reminder.title}',
-          scheduledDate: scheduledDate,
-          notificationDetails: details,
-          androidScheduleMode: exactAlarmScheduleMode,
-          matchDateTimeComponents: matchComponents,
-          payload: 'reminder_recurring',
-        );
+        final alarmPayload = 'reminder_recurring:${reminder.id}';
+        final alarmTitle = '🚨 ${reminder.title}';
+        final alarmBody = reminder.description?.isNotEmpty == true
+            ? reminder.description!
+            : 'Recurring alarm for ${reminder.title}';
+
+        try {
+          await _localNotifications.zonedSchedule(
+            id: notificationId * 16 + 1,
+            title: alarmTitle,
+            body: alarmBody,
+            scheduledDate: scheduledDate,
+            notificationDetails: details,
+            androidScheduleMode: repeatingScheduleMode,
+            matchDateTimeComponents: matchComponents,
+            payload: alarmPayload,
+          );
+        } catch (e) {
+          debugPrint('Failed repeating exactAllowWhileIdle, falling back: $e');
+          await _localNotifications.zonedSchedule(
+            id: notificationId * 16 + 1,
+            title: alarmTitle,
+            body: alarmBody,
+            scheduledDate: scheduledDate,
+            notificationDetails: details,
+            androidScheduleMode: fln.AndroidScheduleMode.inexactAllowWhileIdle,
+            matchDateTimeComponents: matchComponents,
+            payload: alarmPayload,
+          );
+        }
       }
     } catch (e) {
       debugPrint('Warning: Failed to schedule repeating notification: $e');
@@ -380,6 +592,15 @@ class NotificationService {
   Future<void> cancelNotification(String id) async {
     final notificationId = _getNotificationId(id);
     try {
+      // Cancel standard slots
+      await _localNotifications.cancel(id: notificationId * 16);
+      await _localNotifications.cancel(id: notificationId * 16 + 1);
+      // Cancel weekday slots (1..7)
+      for (int d = 1; d <= 7; d++) {
+        await _localNotifications.cancel(id: notificationId * 16 + d * 2);
+        await _localNotifications.cancel(id: notificationId * 16 + d * 2 + 1);
+      }
+      // Cancel legacy slots for backward compatibility
       await _localNotifications.cancel(id: notificationId * 2);
       await _localNotifications.cancel(id: notificationId * 2 + 1);
       await _localNotifications.cancel(id: notificationId);
@@ -405,15 +626,19 @@ class NotificationService {
   }
 
   fln.NotificationDetails _getWarningNotificationDetails(Reminder reminder) {
+    final isVibrating = reminder.alarmVibrationEnabled && reminder.vibrationPattern != 'off';
+    final vibrationList = _getVibrationPattern(reminder.vibrationPattern);
+
     return fln.NotificationDetails(
       android: fln.AndroidNotificationDetails(
         'reminder_channel_v2',
         'Reminder Notifications',
-        channelDescription: '5 minute reminder notifications',
+        channelDescription: 'Advance reminder notifications',
         importance: fln.Importance.max,
         priority: fln.Priority.max,
         playSound: reminder.alarmSoundEnabled,
-        enableVibration: reminder.alarmVibrationEnabled,
+        enableVibration: isVibrating,
+        vibrationPattern: isVibrating ? vibrationList : null,
         category: fln.AndroidNotificationCategory.reminder,
         fullScreenIntent: true,
         audioAttributesUsage: fln.AudioAttributesUsage.notification,
@@ -433,16 +658,19 @@ class NotificationService {
         ? reminder.ringtone!
         : globalRingtone;
     
+    final isVibrating = reminder.alarmVibrationEnabled && reminder.vibrationPattern != 'off';
+    final vibrationList = _getVibrationPattern(reminder.vibrationPattern);
+
     final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
         fln.AndroidFlutterLocalNotificationsPlugin>();
         
-    String channelId = 'alarm_channel_v4';
+    String channelId = 'alarm_channel_v5';
     fln.AndroidNotificationSound? soundSource;
     String channelName = 'Reminder Alarms';
     
     if (androidPlugin != null) {
       if (!reminder.alarmSoundEnabled) {
-        channelId = 'alarm_channel_v4_silent';
+        channelId = 'alarm_channel_v5_silent';
         channelName = 'Silent Alarms';
         await androidPlugin.createNotificationChannel(
           fln.AndroidNotificationChannel(
@@ -451,7 +679,8 @@ class NotificationService {
             description: 'Alarms without sound',
             importance: fln.Importance.max,
             playSound: false,
-            enableVibration: reminder.alarmVibrationEnabled,
+            enableVibration: isVibrating,
+            vibrationPattern: isVibrating ? vibrationList : null,
             enableLights: true,
             audioAttributesUsage: fln.AudioAttributesUsage.alarm,
           ),
@@ -460,7 +689,7 @@ class NotificationService {
         final isBuiltIn = builtInRingtones.any((r) => r.id == ringtoneId);
         
         if (isBuiltIn) {
-          channelId = 'alarm_channel_v4_$ringtoneId';
+          channelId = 'alarm_channel_v5_$ringtoneId';
           soundSource = fln.RawResourceAndroidNotificationSound(ringtoneId);
           final ringtoneObj = builtInRingtones.firstWhere(
             (r) => r.id == ringtoneId,
@@ -474,7 +703,8 @@ class NotificationService {
               description: 'Exact time reminder alarm with ${ringtoneObj.name}',
               importance: fln.Importance.max,
               playSound: true,
-              enableVibration: reminder.alarmVibrationEnabled,
+              enableVibration: isVibrating,
+              vibrationPattern: isVibrating ? vibrationList : null,
               enableLights: true,
               audioAttributesUsage: fln.AudioAttributesUsage.alarm,
               sound: soundSource,
@@ -496,7 +726,7 @@ class NotificationService {
 
           if (contentUri != null && contentUri.isNotEmpty) {
             final hash = ringtoneId.hashCode.abs();
-            channelId = 'alarm_channel_v4_custom_$hash';
+            channelId = 'alarm_channel_v5_custom_$hash';
             soundSource = fln.UriAndroidNotificationSound(contentUri);
             channelName = 'Custom Alarm Sound';
             await androidPlugin.createNotificationChannel(
@@ -506,7 +736,8 @@ class NotificationService {
                 description: 'Exact time reminder alarm with custom sound',
                 importance: fln.Importance.max,
                 playSound: true,
-                enableVibration: reminder.alarmVibrationEnabled,
+                enableVibration: isVibrating,
+                vibrationPattern: isVibrating ? vibrationList : null,
                 enableLights: true,
                 audioAttributesUsage: fln.AudioAttributesUsage.alarm,
                 sound: soundSource,
@@ -514,7 +745,7 @@ class NotificationService {
             );
           } else {
             // Fallback to high priority morning_breeze raw sound so sound is guaranteed to play
-            channelId = 'alarm_channel_v4_morning_breeze';
+            channelId = 'alarm_channel_v5_morning_breeze';
             soundSource = const fln.RawResourceAndroidNotificationSound('morning_breeze');
             channelName = 'Alarm Sound (Morning Breeze)';
             await androidPlugin.createNotificationChannel(
@@ -524,7 +755,8 @@ class NotificationService {
                 description: 'Exact time reminder alarm with Morning Breeze sound',
                 importance: fln.Importance.max,
                 playSound: true,
-                enableVibration: reminder.alarmVibrationEnabled,
+                enableVibration: isVibrating,
+                vibrationPattern: isVibrating ? vibrationList : null,
                 enableLights: true,
                 audioAttributesUsage: fln.AudioAttributesUsage.alarm,
                 sound: soundSource,
@@ -544,7 +776,8 @@ class NotificationService {
         priority: fln.Priority.max,
         playSound: reminder.alarmSoundEnabled,
         sound: reminder.alarmSoundEnabled ? soundSource : null,
-        enableVibration: reminder.alarmVibrationEnabled,
+        enableVibration: isVibrating,
+        vibrationPattern: isVibrating ? vibrationList : null,
         category: fln.AndroidNotificationCategory.alarm,
         fullScreenIntent: true,
         visibility: fln.NotificationVisibility.public,
@@ -573,6 +806,90 @@ class NotificationService {
     );
   }
 
+  /// Trigger an immediate test notification with sound and vibration
+  Future<void> testNotification() async {
+    const details = fln.NotificationDetails(
+      android: fln.AndroidNotificationDetails(
+        'alarm_channel_v5_morning_breeze',
+        'Reminder Alarms (Default)',
+        channelDescription: 'Exact time reminder alarms',
+        importance: fln.Importance.max,
+        priority: fln.Priority.max,
+        playSound: true,
+        enableVibration: true,
+        category: fln.AndroidNotificationCategory.alarm,
+      ),
+      iOS: fln.DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+
+    await _localNotifications.show(
+      id: 9991,
+      title: '🔔 Test Notification',
+      body: 'Timebell notifications are working properly!',
+      notificationDetails: details,
+    );
+  }
+
+  /// Trigger an immediate advance alert preview
+  Future<void> testAdvanceAlert() async {
+    const details = fln.NotificationDetails(
+      android: fln.AndroidNotificationDetails(
+        'reminder_channel_v2',
+        'Reminder Notifications',
+        channelDescription: 'Advance reminder notifications',
+        importance: fln.Importance.high,
+        priority: fln.Priority.high,
+        playSound: true,
+        enableVibration: true,
+        category: fln.AndroidNotificationCategory.reminder,
+      ),
+      iOS: fln.DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+
+    await _localNotifications.show(
+      id: 9992,
+      title: '⏰ Advance Alert Preview',
+      body: 'Reminder: "Project Review" starts in 15 minutes',
+      notificationDetails: details,
+    );
+  }
+
+  /// Trigger a test vibration pattern
+  Future<void> testVibration(String pattern) async {
+    final vibrationList = _getVibrationPattern(pattern);
+    final details = fln.NotificationDetails(
+      android: fln.AndroidNotificationDetails(
+        'vibration_test_channel_${pattern.toLowerCase()}',
+        'Vibration Test',
+        channelDescription: 'Channel for testing vibration patterns',
+        importance: fln.Importance.high,
+        priority: fln.Priority.high,
+        playSound: false,
+        enableVibration: pattern != 'off',
+        vibrationPattern: pattern != 'off' ? vibrationList : null,
+      ),
+      iOS: const fln.DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: false,
+        presentSound: false,
+      ),
+    );
+
+    await _localNotifications.show(
+      id: 9993,
+      title: '📳 Vibration Test ($pattern)',
+      body: 'Testing "${pattern.toUpperCase()}" vibration pattern.',
+      notificationDetails: details,
+    );
+  }
 
   Future<void> showPomodoroFinished() async {
     const details = fln.NotificationDetails(

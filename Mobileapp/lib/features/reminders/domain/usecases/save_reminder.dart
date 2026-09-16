@@ -13,12 +13,12 @@ class SaveReminderUseCase {
 
     await notificationService.cancelNotification(reminder.id);
 
-    if (!reminder.isCompleted && reminder.scheduledAt.isAfter(DateTime.now())) {
+    if (!reminder.isCompleted) {
       if (reminder.isRepeating && reminder.repeatType != RepeatType.none) {
         await notificationService.scheduleRepeatingNotification(
           reminder: reminder,
         );
-      } else {
+      } else if (reminder.scheduledAt.isAfter(DateTime.now().subtract(const Duration(minutes: 1)))) {
         await notificationService.scheduleNotification(
           reminder: reminder,
         );

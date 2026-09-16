@@ -78,7 +78,12 @@ class ApiSyncService {
       alarmSoundEnabled: parseBool(map['alarm_sound_enabled'], true),
       alarmVibrationEnabled: parseBool(map['alarm_vibration_enabled'], true),
       snoozeMinutes: parseInt(map['snooze_minutes'], 5),
+      advanceMinutes: parseInt(map['advance_minutes'], parseBool(map['warning_enabled'], true) ? 5 : 0),
       warningEnabled: parseBool(map['warning_enabled'], true),
+      vibrationPattern: map['vibration_pattern']?.toString() ?? (parseBool(map['alarm_vibration_enabled'], true) ? 'medium' : 'off'),
+      repeatDays: map['repeat_days'] != null
+          ? (map['repeat_days'].toString().split(',').map((s) => int.tryParse(s.trim())).whereType<int>().toList())
+          : null,
       ringtone: map['ringtone']?.toString(),
       createdAt: parseDate(map['created_at']),
     );
@@ -289,7 +294,15 @@ class ApiSyncService {
           'isCompleted': r.isCompleted,
           'isRepeating': r.isRepeating,
           'repeatType': r.repeatType.name,
+          'repeat_days': r.repeatDays?.join(','),
           'hasAlarm': r.hasAlarm,
+          'alarm_enabled': r.alarmEnabled,
+          'alarm_sound_enabled': r.alarmSoundEnabled,
+          'alarm_vibration_enabled': r.alarmVibrationEnabled,
+          'vibration_pattern': r.vibrationPattern,
+          'advance_minutes': r.advanceMinutes,
+          'snooze_minutes': r.snoozeMinutes,
+          'warning_enabled': r.warningEnabled,
           'ringtone': r.ringtone,
         }).toList(),
       };
