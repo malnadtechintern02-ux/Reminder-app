@@ -621,6 +621,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
   Widget _buildChip(String label, Color color, ThemeData theme, {bool isOutlined = false, IconData? icon}) {
     return Container(
+      constraints: const BoxConstraints(maxWidth: 200),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isOutlined ? Colors.transparent : color.withValues(alpha: 0.1),
@@ -634,12 +635,16 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
             Icon(icon, size: 11, color: color),
             const SizedBox(width: 4),
           ],
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
+          Flexible(
+            child: Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

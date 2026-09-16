@@ -202,8 +202,10 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
       _selectedTime.minute,
     );
 
-    // Validate that schedule time is in the future for one-time alerts
-    if (!_isRepeating && scheduledDateTime.isBefore(DateTime.now())) {
+    final now = DateTime.now();
+    final currentMinuteTruncated = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    // Validate that schedule time is not in the past (allowing current minute which triggers immediately)
+    if (!_isRepeating && scheduledDateTime.isBefore(currentMinuteTruncated)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please choose a date/time in the future.')),
       );
@@ -515,6 +517,8 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                           style: TextStyle(
                             color: _alarmSoundEnabled ? theme.colorScheme.primary : theme.disabledColor,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         trailing: Icon(
                           Icons.chevron_right_rounded,

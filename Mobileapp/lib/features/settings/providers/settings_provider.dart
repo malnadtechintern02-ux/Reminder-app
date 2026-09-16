@@ -38,7 +38,8 @@ String formatRingtoneName(String? ringtoneId) {
   for (final r in builtInRingtones) {
     if (r.id == ringtoneId) return r.name;
   }
-  return p.basename(ringtoneId);
+  final base = p.basename(ringtoneId);
+  return base.isNotEmpty ? base : ringtoneId;
 }
 
 

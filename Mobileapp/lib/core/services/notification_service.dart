@@ -201,11 +201,14 @@ class NotificationService {
   }
 
   /// Determine schedule mode based on exact alarm permission
-  Future<fln.AndroidScheduleMode> _determineScheduleMode() async {
+  Future<fln.AndroidScheduleMode> _determineScheduleMode({bool isAlarm = false}) async {
     final canExact = await canScheduleExactAlarms();
-    return canExact
-        ? fln.AndroidScheduleMode.exactAllowWhileIdle
-        : fln.AndroidScheduleMode.inexactAllowWhileIdle;
+    if (!canExact) {
+      return fln.AndroidScheduleMode.inexactAllowWhileIdle;
+    }
+    return isAlarm
+        ? fln.AndroidScheduleMode.alarmClock
+        : fln.AndroidScheduleMode.exactAllowWhileIdle;
   }
 
   int _getNotificationId(String uuid) {
@@ -223,7 +226,8 @@ class NotificationService {
     final notificationId = _getNotificationId(reminder.id);
     final tzScheduledDate = tz.TZDateTime.from(reminder.scheduledAt, tz.local);
     final now = tz.TZDateTime.now(tz.local);
-    final scheduleMode = await _determineScheduleMode();
+    final exactAlarmScheduleMode = await _determineScheduleMode(isAlarm: true);
+    final warningScheduleMode = await _determineScheduleMode(isAlarm: false);
 
     // --------------------------------------------------------
     // 5 MINUTE WARNING
@@ -231,34 +235,64 @@ class NotificationService {
     final fiveMinutesBefore = tzScheduledDate.subtract(const Duration(minutes: 5));
 
     try {
-      if (reminder.warningEnabled && fiveMinutesBefore.isAfter(now)) {
-        await _localNotifications.zonedSchedule(
-          id: notificationId * 2,
-          title: '⏰ Upcoming Reminder',
-          body: '${reminder.title} starts in 5 minutes',
-          scheduledDate: fiveMinutesBefore,
-          notificationDetails: _getWarningNotificationDetails(reminder),
-          androidScheduleMode: scheduleMode,
-          payload: 'reminder_warning',
-        );
+      if (reminder.warningEnabled) {
+        if (fiveMinutesBefore.isAfter(now)) {
+          await _localNotifications.zonedSchedule(
+            id: notificationId * 2,
+            title: '⏰ Upcoming Reminder',
+            body: '${reminder.title} starts in 5 minutes',
+            scheduledDate: fiveMinutesBefore,
+            notificationDetails: _getWarningNotificationDetails(reminder),
+            androidScheduleMode: warningScheduleMode,
+            payload: 'reminder_warning',
+          );
+        } else if (tzScheduledDate.isAfter(now) && tzScheduledDate.difference(now).inSeconds > 10) {
+          // If reminder is scheduled within the next 5 minutes, deliver an immediate warning
+          final minsLeft = tzScheduledDate.difference(now).inMinutes;
+          await _localNotifications.zonedSchedule(
+            id: notificationId * 2,
+            title: '⏰ Upcoming Reminder',
+            body: minsLeft <= 1
+                ? '${reminder.title} starts very soon'
+                : '${reminder.title} starts in $minsLeft minutes',
+            scheduledDate: now.add(const Duration(seconds: 2)),
+            notificationDetails: _getWarningNotificationDetails(reminder),
+            androidScheduleMode: warningScheduleMode,
+            payload: 'reminder_warning',
+          );
+        }
       }
 
       // --------------------------------------------------------
       // EXACT TIME ALARM
       // --------------------------------------------------------
-      if (reminder.alarmEnabled && tzScheduledDate.isAfter(now)) {
-        final details = await _getAlarmNotificationDetails(reminder);
-        await _localNotifications.zonedSchedule(
-          id: notificationId * 2 + 1,
-          title: '🚨 ${reminder.title}',
-          body: reminder.description?.isNotEmpty == true
-              ? reminder.description!
-              : 'Alarm time reached for ${reminder.title}',
-          scheduledDate: tzScheduledDate,
-          notificationDetails: details,
-          androidScheduleMode: scheduleMode,
-          payload: 'reminder_alarm',
-        );
+      if (reminder.alarmEnabled || reminder.hasAlarm) {
+        var targetAlarmTime = tzScheduledDate;
+        if (targetAlarmTime.isBefore(now)) {
+          // If scheduled within the current minute (e.g. within last 60 seconds),
+          // adjust to fire in 8 seconds so it doesn't get dropped!
+          if (now.difference(targetAlarmTime).inSeconds < 60) {
+            targetAlarmTime = now.add(const Duration(seconds: 8));
+          }
+        } else if (targetAlarmTime.difference(now).inSeconds < 4) {
+          // Buffer tiny gap so AlarmManager triggers accurately
+          targetAlarmTime = now.add(const Duration(seconds: 5));
+        }
+
+        if (targetAlarmTime.isAfter(now)) {
+          final details = await _getAlarmNotificationDetails(reminder);
+          await _localNotifications.zonedSchedule(
+            id: notificationId * 2 + 1,
+            title: '🚨 ${reminder.title}',
+            body: reminder.description?.isNotEmpty == true
+                ? reminder.description!
+                : 'Alarm time reached for ${reminder.title}',
+            scheduledDate: targetAlarmTime,
+            notificationDetails: details,
+            androidScheduleMode: exactAlarmScheduleMode,
+            payload: 'reminder_alarm',
+          );
+        }
       }
     } catch (e) {
       debugPrint('Warning: Failed to schedule notification: $e');
@@ -302,20 +336,37 @@ class NotificationService {
       matchComponents = fln.DateTimeComponents.dayOfMonthAndTime;
     }
 
-    final scheduleMode = await _determineScheduleMode();
+    final exactAlarmScheduleMode = await _determineScheduleMode(isAlarm: true);
+    final warningScheduleMode = await _determineScheduleMode(isAlarm: false);
 
     try {
-      if (reminder.alarmEnabled) {
+      if (reminder.warningEnabled) {
+        final warningDate = scheduledDate.subtract(const Duration(minutes: 5));
+        if (warningDate.isAfter(now)) {
+          await _localNotifications.zonedSchedule(
+            id: notificationId * 2,
+            title: '⏰ Upcoming Reminder',
+            body: '${reminder.title} starts in 5 minutes',
+            scheduledDate: warningDate,
+            notificationDetails: _getWarningNotificationDetails(reminder),
+            androidScheduleMode: warningScheduleMode,
+            matchDateTimeComponents: matchComponents,
+            payload: 'reminder_warning',
+          );
+        }
+      }
+
+      if (reminder.alarmEnabled || reminder.hasAlarm) {
         final details = await _getAlarmNotificationDetails(reminder);
         await _localNotifications.zonedSchedule(
-          id: notificationId,
+          id: notificationId * 2 + 1,
           title: '🚨 ${reminder.title}',
           body: reminder.description?.isNotEmpty == true
               ? reminder.description!
               : 'Recurring alarm for ${reminder.title}',
           scheduledDate: scheduledDate,
           notificationDetails: details,
-          androidScheduleMode: scheduleMode,
+          androidScheduleMode: exactAlarmScheduleMode,
           matchDateTimeComponents: matchComponents,
           payload: 'reminder_recurring',
         );
@@ -343,7 +394,7 @@ class NotificationService {
     for (final reminder in reminders) {
       await cancelNotification(reminder.id);
 
-      if (!reminder.isCompleted && reminder.alarmEnabled) {
+      if (!reminder.isCompleted && (reminder.alarmEnabled || reminder.warningEnabled || reminder.hasAlarm)) {
         if (reminder.isRepeating && reminder.repeatType != RepeatType.none) {
           await scheduleRepeatingNotification(reminder: reminder);
         } else if (reminder.scheduledAt.isAfter(now)) {
@@ -359,10 +410,13 @@ class NotificationService {
         'reminder_channel_v2',
         'Reminder Notifications',
         channelDescription: '5 minute reminder notifications',
-        importance: fln.Importance.high,
-        priority: fln.Priority.high,
+        importance: fln.Importance.max,
+        priority: fln.Priority.max,
         playSound: reminder.alarmSoundEnabled,
         enableVibration: reminder.alarmVibrationEnabled,
+        category: fln.AndroidNotificationCategory.reminder,
+        fullScreenIntent: true,
+        audioAttributesUsage: fln.AudioAttributesUsage.notification,
       ),
       iOS: fln.DarwinNotificationDetails(
         presentAlert: true,
@@ -382,15 +436,18 @@ class NotificationService {
     final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
         fln.AndroidFlutterLocalNotificationsPlugin>();
         
-    String channelId = 'alarm_channel_v2';
+    String channelId = 'alarm_channel_v4';
+    fln.AndroidNotificationSound? soundSource;
+    String channelName = 'Reminder Alarms';
     
     if (androidPlugin != null) {
       if (!reminder.alarmSoundEnabled) {
-        channelId = 'alarm_channel_silent';
+        channelId = 'alarm_channel_v4_silent';
+        channelName = 'Silent Alarms';
         await androidPlugin.createNotificationChannel(
           fln.AndroidNotificationChannel(
             channelId,
-            'Silent Alarms',
+            channelName,
             description: 'Alarms without sound',
             importance: fln.Importance.max,
             playSound: false,
@@ -403,55 +460,74 @@ class NotificationService {
         final isBuiltIn = builtInRingtones.any((r) => r.id == ringtoneId);
         
         if (isBuiltIn) {
-          channelId = 'alarm_channel_$ringtoneId';
+          channelId = 'alarm_channel_v4_$ringtoneId';
+          soundSource = fln.RawResourceAndroidNotificationSound(ringtoneId);
           final ringtoneObj = builtInRingtones.firstWhere(
             (r) => r.id == ringtoneId,
             orElse: () => BuiltInRingtone(id: ringtoneId, name: ringtoneId),
           );
+          channelName = 'Alarm Sound (${ringtoneObj.name})';
           await androidPlugin.createNotificationChannel(
             fln.AndroidNotificationChannel(
               channelId,
-              'Alarm Sound (${ringtoneObj.name})',
+              channelName,
               description: 'Exact time reminder alarm with ${ringtoneObj.name}',
               importance: fln.Importance.max,
               playSound: true,
               enableVibration: reminder.alarmVibrationEnabled,
               enableLights: true,
               audioAttributesUsage: fln.AudioAttributesUsage.alarm,
-              sound: fln.RawResourceAndroidNotificationSound(ringtoneId),
+              sound: soundSource,
             ),
           );
         } else {
           final customFile = File(ringtoneId);
+          String? contentUri;
           if (customFile.existsSync()) {
+            try {
+              contentUri = await _settingsChannel.invokeMethod<String>(
+                'getMediaUriForFile',
+                {'path': customFile.absolute.path},
+              );
+            } catch (e) {
+              debugPrint('Error resolving media content URI: $e');
+            }
+          }
+
+          if (contentUri != null && contentUri.isNotEmpty) {
             final hash = ringtoneId.hashCode.abs();
-            channelId = 'alarm_channel_custom_$hash';
+            channelId = 'alarm_channel_v4_custom_$hash';
+            soundSource = fln.UriAndroidNotificationSound(contentUri);
+            channelName = 'Custom Alarm Sound';
             await androidPlugin.createNotificationChannel(
               fln.AndroidNotificationChannel(
                 channelId,
-                'Custom Alarm Sound',
+                channelName,
                 description: 'Exact time reminder alarm with custom sound',
                 importance: fln.Importance.max,
                 playSound: true,
                 enableVibration: reminder.alarmVibrationEnabled,
                 enableLights: true,
                 audioAttributesUsage: fln.AudioAttributesUsage.alarm,
-                sound: fln.UriAndroidNotificationSound('file://$ringtoneId'),
+                sound: soundSource,
               ),
             );
           } else {
-            // Fallback to default morning_breeze channel if custom file is missing
-            channelId = 'alarm_channel_morning_breeze';
+            // Fallback to high priority morning_breeze raw sound so sound is guaranteed to play
+            channelId = 'alarm_channel_v4_morning_breeze';
+            soundSource = const fln.RawResourceAndroidNotificationSound('morning_breeze');
+            channelName = 'Alarm Sound (Morning Breeze)';
             await androidPlugin.createNotificationChannel(
               fln.AndroidNotificationChannel(
                 channelId,
-                'Alarm Sound (Morning Breeze)',
+                channelName,
                 description: 'Exact time reminder alarm with Morning Breeze sound',
                 importance: fln.Importance.max,
                 playSound: true,
+                enableVibration: reminder.alarmVibrationEnabled,
                 enableLights: true,
                 audioAttributesUsage: fln.AudioAttributesUsage.alarm,
-                sound: const fln.RawResourceAndroidNotificationSound('morning_breeze'),
+                sound: soundSource,
               ),
             );
           }
@@ -462,16 +538,18 @@ class NotificationService {
     return fln.NotificationDetails(
       android: fln.AndroidNotificationDetails(
         channelId,
-        'Reminder Alarms',
+        channelName,
         channelDescription: 'Exact time reminder alarms',
         importance: fln.Importance.max,
         priority: fln.Priority.max,
         playSound: reminder.alarmSoundEnabled,
+        sound: reminder.alarmSoundEnabled ? soundSource : null,
         enableVibration: reminder.alarmVibrationEnabled,
         category: fln.AndroidNotificationCategory.alarm,
         fullScreenIntent: true,
         visibility: fln.NotificationVisibility.public,
         audioAttributesUsage: fln.AudioAttributesUsage.alarm,
+        additionalFlags: reminder.alarmSoundEnabled ? Int32List.fromList(<int>[4]) : null,
         ticker: 'Alarm: ${reminder.title}',
         actions: const <fln.AndroidNotificationAction>[
           fln.AndroidNotificationAction(

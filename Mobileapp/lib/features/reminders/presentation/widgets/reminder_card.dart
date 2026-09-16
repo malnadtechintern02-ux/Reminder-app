@@ -185,6 +185,7 @@ class ReminderCard extends ConsumerWidget {
                           // Alarm Chip
                           if (reminder.alarmEnabled)
                             Container(
+                              constraints: const BoxConstraints(maxWidth: 200),
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.orange.withValues(alpha: 0.12),
@@ -199,14 +200,18 @@ class ReminderCard extends ConsumerWidget {
                                     color: Colors.orange,
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    reminder.alarmSoundEnabled && reminder.ringtone != null && reminder.ringtone!.isNotEmpty
-                                        ? 'ALARM • ${formatRingtoneName(reminder.ringtone).toUpperCase()}'
-                                        : 'ALARM',
-                                    style: const TextStyle(
-                                      color: Colors.orange,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
+                                  Flexible(
+                                    child: Text(
+                                      reminder.alarmSoundEnabled && reminder.ringtone != null && reminder.ringtone!.isNotEmpty
+                                          ? 'ALARM • ${formatRingtoneName(reminder.ringtone).toUpperCase()}'
+                                          : 'ALARM',
+                                      style: const TextStyle(
+                                        color: Colors.orange,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],

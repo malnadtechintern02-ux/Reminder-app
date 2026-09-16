@@ -559,12 +559,27 @@ class SettingsPage extends ConsumerWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary,
               shape: BoxShape.circle,
-              image: const DecorationImage(
-                image: AssetImage('assets/images/logo.png'),
-                fit: BoxFit.cover,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  theme.primaryColor,
+                  const Color(0xFF818CF8),
+                ],
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.primaryColor.withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.notifications_active_rounded,
+              color: Colors.white,
+              size: 30,
             ),
           ),
           const SizedBox(width: 16),
@@ -829,6 +844,8 @@ class _SettingsTile extends StatelessWidget {
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],

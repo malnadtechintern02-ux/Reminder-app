@@ -15,7 +15,13 @@ class PermissionHelper {
 
     // Check if permissions are already granted
     final alreadyGranted = await notificationService.areNotificationsPermitted();
-    if (alreadyGranted) return true;
+    final canExact = await notificationService.canScheduleExactAlarms();
+    if (alreadyGranted) {
+      if (!canExact) {
+        await notificationService.requestExactAlarmsPermission();
+      }
+      return true;
+    }
 
     if (!context.mounted) return false;
 
