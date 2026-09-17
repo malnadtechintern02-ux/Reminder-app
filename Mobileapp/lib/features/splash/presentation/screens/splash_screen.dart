@@ -111,28 +111,35 @@ class _SplashScreenState extends State<SplashScreen>
                       width: 120,
                       height: 120,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            theme.primaryColor,
-                            const Color(0xFF818CF8),
-                          ],
-                        ),
+                        borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
                             color: theme.primaryColor
-                                .withValues(alpha: 0.3 * _pulseAnimation.value),
+                                .withValues(alpha: 0.35 * _pulseAnimation.value),
                             blurRadius: 40 * _pulseAnimation.value,
                             spreadRadius: 8 * _pulseAnimation.value,
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.notifications_active_rounded,
-                        color: Colors.white,
-                        size: 52,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [theme.primaryColor, const Color(0xFF818CF8)],
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.notifications_active_rounded,
+                              color: Colors.white,
+                              size: 52,
+                            ),
+                          ),
+                        ),
                       ),
                     );
                   },

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
@@ -12,7 +12,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../../../app/theme/theme_provider.dart';
-import '../../../../app/app.dart';
 import '../../providers/settings_provider.dart';
 import '../../../reminders/presentation/providers/reminder_list_provider.dart';
 import '../../../reminders/domain/entities/reminder.dart';
@@ -66,20 +65,6 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.access_time,
                 value: settings.use24HourFormat,
                 onChanged: (val) => ref.read(settingsNotifierProvider.notifier).setUse24HourFormat(val),
-              ),
-              const _SettingsTile(
-                title: 'Theme Color',
-                subtitle: 'Personalize your accent color',
-                icon: Icons.palette_outlined,
-                showDivider: false,
-                trailing: SizedBox.shrink(),
-              ),
-              const _AccentColorPicker(),
-              Divider(
-                height: 1,
-                thickness: 1,
-                indent: 56,
-                color: theme.colorScheme.outline.withValues(alpha: 0.1),
               ),
               _SettingsTile(
                 title: 'Share App',
@@ -546,46 +531,77 @@ class SettingsPage extends ConsumerWidget {
   Widget _buildProfileCard(ThemeData theme, bool isDarkMode) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDarkMode ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDarkMode
+              ? [
+                  const Color(0xFF1E1B4B), // Deep Indigo / Purple
+                  const Color(0xFF312E81),
+                  const Color(0xFF2E1065),
+                ]
+              : [
+                  const Color(0xFFEEF2FF),
+                  const Color(0xFFE0E7FF),
+                  const Color(0xFFEDE9FE),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF818CF8).withValues(alpha: isDarkMode ? 0.35 : 0.4),
+          width: 1.2,
+        ),
         boxShadow: [
-          if (!isDarkMode)
-            BoxShadow(
-              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
+          BoxShadow(
+            color: const Color(0xFF6366F1).withValues(alpha: isDarkMode ? 0.25 : 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
+              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  theme.primaryColor,
-                  const Color(0xFF818CF8),
+                  Color(0xFF6366F1), // Primary Indigo
+                  Color(0xFF818CF8), // Purple
                 ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: theme.primaryColor.withValues(alpha: 0.35),
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.4),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.notifications_active_rounded,
-              color: Colors.white,
-              size: 30,
+            padding: const EdgeInsets.all(3),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(13),
+              child: Container(
+                color: const Color(0xFF0F172A),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: const Color(0xFF6366F1),
+                    child: const Icon(
+                      Icons.notifications_active_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -593,18 +609,45 @@ class SettingsPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Time Bell',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? theme.colorScheme.onSurface : theme.colorScheme.onPrimaryContainer,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Time Bell',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.white : const Color(0xFF1E1B4B),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withValues(alpha: isDarkMode ? 0.3 : 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF818CF8).withValues(alpha: 0.4),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        'v1.0.0',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDarkMode ? const Color(0xFFA5B4FC) : const Color(0xFF4F46E5),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Your personal productivity assistant',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDarkMode ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                    color: isDarkMode
+                        ? Colors.white.withValues(alpha: 0.75)
+                        : const Color(0xFF4338CA).withValues(alpha: 0.85),
                   ),
                 ),
               ],
@@ -957,125 +1000,6 @@ class _SettingsSwitch extends StatelessWidget {
   }
 }
 
-class _AccentColorPicker extends ConsumerWidget {
-  const _AccentColorPicker();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final settings = ref.watch(settingsNotifierProvider);
-    final selectedIndex = settings.accentColorIndex;
-    final customAccentColor = settings.customAccentColor;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            ...List.generate(appAccentColors.length, (index) {
-              final color = appAccentColors[index];
-              final isSelected = selectedIndex == index;
-              return GestureDetector(
-                onTap: () => ref.read(settingsNotifierProvider.notifier).setAccentColorIndex(index),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 12),
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? theme.colorScheme.onSurface : Colors.transparent,
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
-                ),
-              );
-            }),
-            // Custom Color Button
-            GestureDetector(
-              onTap: () {
-                _showColorPicker(context, ref, customAccentColor ?? appAccentColors[0].toARGB32());
-              },
-              child: Container(
-                margin: const EdgeInsets.only(right: 12),
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: selectedIndex == -1 && customAccentColor != null ? Color(customAccentColor) : theme.colorScheme.surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selectedIndex == -1 ? theme.colorScheme.onSurface : theme.colorScheme.outline,
-                    width: 2,
-                  ),
-                  boxShadow: selectedIndex == -1 && customAccentColor != null
-                      ? [
-                          BoxShadow(
-                            color: Color(customAccentColor).withValues(alpha: 0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Icon(
-                  selectedIndex == -1 ? Icons.check : Icons.add,
-                  color: selectedIndex == -1 ? Colors.white : theme.colorScheme.onSurfaceVariant,
-                  size: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showColorPicker(BuildContext context, WidgetRef ref, int currentColorValue) {
-    Color pickerColor = Color(currentColorValue);
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Pick a color'),
-          content: SingleChildScrollView(
-            child: BlockPicker(
-              pickerColor: pickerColor,
-              onColorChanged: (Color color) {
-                pickerColor = color;
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            ElevatedButton(
-              child: const Text('Select'),
-              onPressed: () {
-                ref.read(settingsNotifierProvider.notifier).setCustomAccentColor(pickerColor.toARGB32());
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
 
 class PrivacyPolicyPage extends StatelessWidget {
   const PrivacyPolicyPage({super.key});

@@ -1,8 +1,14 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reminder_app/features/reminders/data/models/reminder_model.dart';
 import 'package:reminder_app/features/reminders/domain/entities/reminder.dart';
 
 void main() {
+  test('App logo asset is present and loadable', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final byteData = await rootBundle.load('assets/images/logo.png');
+    expect(byteData.lengthInBytes, greaterThan(0));
+  });
   group('ReminderModel Serialization Tests', () {
     final reminderDate = DateTime(2026, 8, 29, 12, 0);
     final creationDate = DateTime(2026, 8, 29, 10, 0);
