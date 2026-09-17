@@ -127,12 +127,16 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
 
 
-  void _snoozeReminder(BuildContext ctx, Reminder reminder, int minutes) {
+  void _snoozeReminder(BuildContext pageContext, Reminder reminder, int minutes) {
     final newTime = DateTime.now().add(Duration(minutes: minutes));
     final updated = reminder.copyWith(scheduledAt: newTime);
     ref.read(reminderListNotifierProvider.notifier).saveReminder(updated);
-    Navigator.pop(ctx);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Snoozed for $minutes minutes')));
+    ScaffoldMessenger.of(pageContext).showSnackBar(
+      SnackBar(
+        content: Text('Snoozed for $minutes minutes'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override

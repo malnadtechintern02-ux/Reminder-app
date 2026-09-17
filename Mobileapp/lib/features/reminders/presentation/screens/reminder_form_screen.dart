@@ -378,20 +378,22 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                         onTap: _pickDate,
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
                           child: Row(
                             children: [
-                              Icon(Icons.calendar_today_rounded, color: theme.primaryColor, size: 20),
-                              const SizedBox(width: 10),
+                              Icon(Icons.calendar_today_rounded, color: theme.primaryColor, size: 18),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Date', style: theme.textTheme.bodyMedium),
+                                    Text('Date', style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12)),
                                     const SizedBox(height: 2),
                                     Text(
                                       DateFormat.yMMMd().format(_selectedDate),
-                                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 13),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 12),
                                     ),
                                   ],
                                 ),
@@ -402,7 +404,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Card(
                       color: theme.cardColor,
@@ -410,20 +412,22 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                         onTap: _pickTime,
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
                           child: Row(
                             children: [
-                              Icon(Icons.access_time_rounded, color: theme.primaryColor, size: 20),
-                              const SizedBox(width: 10),
+                              Icon(Icons.access_time_rounded, color: theme.primaryColor, size: 18),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Time', style: theme.textTheme.bodyMedium),
+                                    Text('Time', style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12)),
                                     const SizedBox(height: 2),
                                     Text(
                                       _selectedTime.format(context),
-                                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 13),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 12),
                                     ),
                                   ],
                                 ),
@@ -434,7 +438,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Card(
                       color: theme.cardColor,
@@ -442,11 +446,11 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                         onTap: _pickEndTime,
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
                           child: Row(
                             children: [
-                              Icon(Icons.update_rounded, color: theme.primaryColor, size: 20),
-                              const SizedBox(width: 10),
+                              Icon(Icons.update_rounded, color: theme.primaryColor, size: 18),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -11,12 +11,17 @@ import '../services/notification_service.dart';
 import '../utils/ui_helpers.dart';
 
 class ApiSyncService {
-  // Optional user-configured backend API URL (empty by default for 100% offline mode)
-  static const String defaultBaseUrl = '';
+  // Configured backend API URL (defaults to local XAMPP backend)
+  static String get defaultBaseUrl {
+    if (kIsWeb) return 'http://localhost/reminderapp/api';
+    return 'http://10.0.2.2/reminderapp/api';
+  }
 
   static Future<String> getBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('server_base_url') ?? defaultBaseUrl;
+    final saved = prefs.getString('server_base_url');
+    if (saved != null && saved.isNotEmpty) return saved;
+    return defaultBaseUrl;
   }
 
   static Future<void> setBaseUrl(String url) async {

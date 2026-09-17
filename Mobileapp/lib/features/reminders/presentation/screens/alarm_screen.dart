@@ -286,11 +286,17 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
             ),
           ),
           child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
 
                   // Animated Bell Icon
                   ScaleTransition(
@@ -544,11 +550,15 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
 
                   const SizedBox(height: 16),
                 ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

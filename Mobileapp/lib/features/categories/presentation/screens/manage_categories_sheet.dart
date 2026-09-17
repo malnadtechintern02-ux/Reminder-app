@@ -209,6 +209,7 @@ class ManageCategoriesSheet extends ConsumerWidget {
             onPressed: () async {
               await ref.read(categoryRepositoryProvider).deleteCategory(category.id);
               ref.invalidate(categoriesFutureProvider);
+              await ref.read(reminderListNotifierProvider.notifier).loadReminders();
               if (context.mounted) {
                 Navigator.of(ctx).pop();
               }

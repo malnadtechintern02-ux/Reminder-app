@@ -16,7 +16,6 @@ import '../../../../app/app.dart';
 import '../../providers/settings_provider.dart';
 import '../../../reminders/presentation/providers/reminder_list_provider.dart';
 import '../../../reminders/domain/entities/reminder.dart';
-import '../../../../core/network/api_sync_service.dart';
 import '../../../../core/services/notification_service.dart';
 import 'ringtone_selection_screen.dart';
 
@@ -308,75 +307,6 @@ class SettingsPage extends ConsumerWidget {
           _SettingsSection(
             title: 'Server & Synchronization',
             children: [
-              FutureBuilder<String>(
-                future: ApiSyncService.getBaseUrl(),
-                builder: (context, snapshot) {
-                  final currentUrl = snapshot.data ?? '';
-                  final displayUrl = currentUrl.isNotEmpty
-                      ? currentUrl
-                      : 'Not configured (Offline mode)';
-                  return _SettingsTile(
-                    title: 'Server Sync URL',
-                    subtitle: displayUrl,
-                    icon: Icons.cloud_sync_outlined,
-                    trailing: const Icon(Icons.edit_outlined, size: 20),
-                    showDivider: true,
-                    onTap: () async {
-                      final controller = TextEditingController(text: currentUrl);
-                      final newUrl = await showDialog<String>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Server Sync URL'),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Enter your backend API URL (leave empty for offline mode):',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              const SizedBox(height: 12),
-                              TextField(
-                                controller: controller,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'https://your-domain.com/api',
-                                ),
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-                              child: const Text('Save'),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (newUrl != null) {
-                        await ApiSyncService.setBaseUrl(newUrl);
-                        if (newUrl.isNotEmpty) {
-                          await ref.read(reminderListNotifierProvider.notifier).syncWithServer();
-                        }
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(newUrl.isNotEmpty
-                                  ? 'Server URL updated to $newUrl'
-                                  : 'Offline mode active (no remote sync)'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                  );
-                },
-              ),
               _SettingsTile(
                 title: 'Sync Now',
                 subtitle: 'Pull latest reminders from admin panel',

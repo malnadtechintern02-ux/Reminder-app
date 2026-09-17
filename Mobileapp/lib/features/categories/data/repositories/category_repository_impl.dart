@@ -150,6 +150,39 @@ class CategoryRepositoryImpl implements CategoryRepository {
   @override
   Future<void> deleteCategory(String id) async {
     final db = await _databaseHelper.database;
+    // Find an alternative category to reassign reminders so CASCADE delete does not erase them
+    final otherCategories = await db.query(
+      'categories',
+      where: 'id != ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    String fallbackId;
+    if (otherCategories.isNotEmpty) {
+      fallbackId = otherCategories.first['id'].toString();
+    } else {
+      // Create a default fallback category so reminders remain intact
+      fallbackId = 'general';
+      await db.insert(
+        'categories',
+        {
+          'id': fallbackId,
+          'name': 'General',
+          'icon': 'folder',
+          'color': '#4A90E2',
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    // Reassign reminders
+    await db.update(
+      'reminders',
+      {'category_id': fallbackId},
+      where: 'category_id = ?',
+      whereArgs: [id],
+    );
+
     await db.delete(
       'categories',
       where: 'id = ?',
