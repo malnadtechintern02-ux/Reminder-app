@@ -16,9 +16,28 @@ void main() async {
   final notificationService = NotificationService.instance;
   await notificationService.init();
 
-  // Route alarm notifications to the full-screen AlarmScreen
-  NotificationService.onAlarmTriggered = (reminderId) {
-    appRouter.push('/alarm/$reminderId');
+  // Check if app was cold-launched by an alarm notification or full-screen intent
+  final launchAlarmId = await notificationService.getLaunchAlarmReminderId();
+  if (launchAlarmId != null) {
+    await notificationService.wakeUpScreen();
+    appRouter = createAppRouter(initialLocation: '/alarm/$launchAlarmId');
+  } else {
+    appRouter = createAppRouter();
+  }
+
+  // Route alarm notifications to the full-screen AlarmScreen when triggered while app is active/background
+  NotificationService.onAlarmTriggered = (reminderId) async {
+    await notificationService.wakeUpScreen();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        appRouter.go('/alarm/$reminderId');
+      } catch (e) {
+        debugPrint('Error navigating to alarm: $e');
+        try {
+          appRouter.push('/alarm/$reminderId');
+        } catch (_) {}
+      }
+    });
   };
 
   runApp(

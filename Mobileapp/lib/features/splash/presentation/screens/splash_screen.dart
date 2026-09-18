@@ -58,7 +58,10 @@ class _SplashScreenState extends State<SplashScreen>
     // Navigate to home after delay
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) {
-        context.go('/schedule');
+        final location = GoRouterState.of(context).uri.toString();
+        if (!location.startsWith('/alarm')) {
+          context.go('/schedule');
+        }
       }
     });
   }

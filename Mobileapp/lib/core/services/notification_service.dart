@@ -67,13 +67,28 @@ class NotificationService {
       settings: initializationSettings,
       onDidReceiveNotificationResponse: (fln.NotificationResponse response) {
         final payload = response.payload;
-        if (payload != null && payload.startsWith('reminder_alarm:')) {
-          final id = payload.substring('reminder_alarm:'.length);
-          onAlarmTriggered?.call(id);
+        if (payload != null) {
+          if (payload.startsWith('reminder_alarm:')) {
+            final id = payload.substring('reminder_alarm:'.length);
+            onAlarmTriggered?.call(id);
+          } else if (payload.startsWith('reminder_recurring:')) {
+            final id = payload.substring('reminder_recurring:'.length);
+            onAlarmTriggered?.call(id);
+          }
         }
       },
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
+
+    // Listen for native Android AlarmManager triggers that wake the device
+    _settingsChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onAlarmTriggered') {
+        final id = call.arguments as String?;
+        if (id != null && id.isNotEmpty) {
+          onAlarmTriggered?.call(id);
+        }
+      }
+    });
 
     // Create Notification Channels for Android
     final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
@@ -192,6 +207,122 @@ class NotificationService {
       }
     }
     return false;
+  }
+
+  /// Checks if the app was cold-launched by an alarm notification or native AlarmClock intent
+  Future<String?> getLaunchAlarmReminderId() async {
+    // 1. Check native Android Intent directly
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        final nativeId = await _settingsChannel.invokeMethod<String>('getInitialAlarmReminderId');
+        if (nativeId != null && nativeId.isNotEmpty) {
+          debugPrint('Detected cold start from native AlarmClock intent: $nativeId');
+          return nativeId;
+        }
+      } catch (e) {
+        debugPrint('Error reading native launch alarm ID: $e');
+      }
+    }
+
+    // 2. Fallback to notification launch details
+    try {
+      final launchDetails = await _localNotifications.getNotificationAppLaunchDetails();
+      if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
+        final response = launchDetails.notificationResponse;
+        if (response != null && (response.actionId == null || response.actionId!.isEmpty)) {
+          final payload = response.payload;
+          if (payload != null) {
+            if (payload.startsWith('reminder_alarm:')) {
+              return payload.substring('reminder_alarm:'.length);
+            } else if (payload.startsWith('reminder_recurring:')) {
+              return payload.substring('reminder_recurring:'.length);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error reading notification launch details: $e');
+    }
+    return null;
+  }
+
+  /// Schedules an OS-level AlarmManager.AlarmClock that physically powers on the screen
+  /// and launches the full-screen alarm directly over the lockscreen.
+  Future<void> scheduleNativeAlarm({
+    required String reminderId,
+    required int triggerAtMillis,
+    required String title,
+  }) async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _settingsChannel.invokeMethod('scheduleNativeAlarm', {
+          'reminderId': reminderId,
+          'triggerAtMillis': triggerAtMillis,
+          'title': title,
+        });
+      } catch (e) {
+        debugPrint('Error scheduling native AlarmClock: $e');
+      }
+    }
+  }
+
+  /// Cancels an OS-level AlarmManager.AlarmClock
+  Future<void> cancelNativeAlarm(String reminderId) async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _settingsChannel.invokeMethod('cancelNativeAlarm', {
+          'reminderId': reminderId,
+        });
+      } catch (e) {
+        debugPrint('Error cancelling native AlarmClock: $e');
+      }
+    }
+  }
+
+  /// Powers on the display and sets keep-screen-on flags on Android
+  Future<void> wakeUpScreen() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _settingsChannel.invokeMethod('wakeUpScreen');
+      } catch (e) {
+        debugPrint('Error invoking wakeUpScreen: $e');
+      }
+    }
+  }
+
+  /// Releases wake locks and clears keep-screen-on flags
+  Future<void> dismissAlarmFlags() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _settingsChannel.invokeMethod('clearKeepScreenOn');
+      } catch (e) {
+        debugPrint('Error invoking clearKeepScreenOn: $e');
+      }
+    }
+  }
+
+  /// Checks if full-screen intents are allowed on Android 14+ (API 34+)
+  Future<bool> canUseFullScreenIntent() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        final result = await _settingsChannel.invokeMethod<bool>('canUseFullScreenIntent');
+        return result ?? true;
+      } catch (e) {
+        debugPrint('Error checking full-screen intent permission: $e');
+      }
+    }
+    return true;
+  }
+
+  /// Requests full-screen intent permission on Android 14+ (API 34+)
+  Future<void> requestFullScreenIntentPermission() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _settingsChannel.invokeMethod('requestFullScreenIntentPermission');
+      } catch (e) {
+        debugPrint('Error requesting full-screen intent permission: $e');
+      }
+    }
   }
 
   Future<void> requestPermissions() async {
@@ -357,6 +488,13 @@ class NotificationService {
         }
 
         if (targetAlarmTime.isAfter(now)) {
+          // Schedule native OS AlarmManager AlarmClock (physically powers on screen & launches full screen)
+          await scheduleNativeAlarm(
+            reminderId: reminder.id,
+            triggerAtMillis: targetAlarmTime.millisecondsSinceEpoch,
+            title: reminder.title,
+          );
+
           final details = await _getAlarmNotificationDetails(reminder);
           final alarmPayload = 'reminder_alarm:${reminder.id}';
           final alarmTitle = '🚨 ${reminder.title}';
@@ -486,6 +624,28 @@ class NotificationService {
             }
           }
         }
+
+        // Schedule native AlarmClock for the earliest upcoming day instance
+        if (reminder.alarmEnabled || reminder.hasAlarm) {
+          tz.TZDateTime? earliest;
+          for (final day in targetDays) {
+            final inst = _nextInstanceOfWeekdayAndTime(
+              day,
+              reminder.scheduledAt.hour,
+              reminder.scheduledAt.minute,
+            );
+            if (earliest == null || inst.isBefore(earliest)) {
+              earliest = inst;
+            }
+          }
+          if (earliest != null) {
+            await scheduleNativeAlarm(
+              reminderId: reminder.id,
+              triggerAtMillis: earliest.millisecondsSinceEpoch,
+              title: reminder.title,
+            );
+          }
+        }
         return;
       }
 
@@ -582,6 +742,13 @@ class NotificationService {
             payload: alarmPayload,
           );
         }
+
+        // Schedule native AlarmClock for the upcoming repeating instance
+        await scheduleNativeAlarm(
+          reminderId: reminder.id,
+          triggerAtMillis: scheduledDate.millisecondsSinceEpoch,
+          title: reminder.title,
+        );
       }
     } catch (e) {
       debugPrint('Warning: Failed to schedule repeating notification: $e');
@@ -590,6 +757,7 @@ class NotificationService {
 
   /// Cancels any scheduled notification or alarm for the given reminder id
   Future<void> cancelNotification(String id) async {
+    await cancelNativeAlarm(id);
     final notificationId = _getNotificationId(id);
     try {
       // Cancel standard slots

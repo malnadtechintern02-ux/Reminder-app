@@ -188,6 +188,14 @@ class SettingsPage extends ConsumerWidget {
                 showDivider: true,
               ),
               _SettingsTile(
+                title: 'Full-Screen Alarm & Screen Wake',
+                subtitle: 'Turn on screen & display over lock screen',
+                icon: Icons.screen_lock_portrait_outlined,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                onTap: () => _checkAndRequestFullScreenAlarmPermission(context),
+                showDivider: true,
+              ),
+              _SettingsTile(
                 title: 'Background & Battery Settings',
                 subtitle: 'Prevent Android from putting alarms to sleep',
                 icon: Icons.battery_charging_full_outlined,
@@ -435,6 +443,46 @@ class SettingsPage extends ConsumerWidget {
                 onPressed: () async {
                   Navigator.pop(ctx);
                   await NotificationService.instance.requestExactAlarmsPermission();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _checkAndRequestFullScreenAlarmPermission(BuildContext context) async {
+    final canFullScreen = await NotificationService.instance.canUseFullScreenIntent();
+    if (context.mounted) {
+      if (canFullScreen) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✓ Full-screen alarm & screen wake permissions are active!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Full-Screen Alarm Permission'),
+            content: const Text(
+              'Android requires permission for Time Bell to turn on the screen and show the full-screen alarm over the lock screen.\n\n'
+              'Please allow "Full-screen intent" / "Show on Lock Screen" in the settings screen.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await NotificationService.instance.requestFullScreenIntentPermission();
                 },
                 child: const Text('Open Settings'),
               ),

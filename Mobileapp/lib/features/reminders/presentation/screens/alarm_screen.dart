@@ -25,10 +25,11 @@ class AlarmScreen extends ConsumerStatefulWidget {
   ConsumerState<AlarmScreen> createState() => _AlarmScreenState();
 }
 
-class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProviderStateMixin {
+class _AlarmScreenState extends ConsumerState<AlarmScreen> with TickerProviderStateMixin {
   final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  late AnimationController _rippleController;
   Timer? _clockTimer;
   Timer? _vibrationTimer;
   DateTime _currentTime = DateTime.now();
@@ -40,6 +41,12 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
   void initState() {
     super.initState();
 
+    // Enable true full-screen immersive mode (hide Android status/nav bars)
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    // Keep screen on and wake up display immediately
+    NotificationService.instance.wakeUpScreen();
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -48,6 +55,11 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _rippleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
 
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
@@ -184,6 +196,8 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
     }
     // Cancel the notification banner on the device
     await NotificationService.instance.cancelNotification(widget.reminderId);
+    // Release keep screen on flags
+    await NotificationService.instance.dismissAlarmFlags();
   }
 
   Future<void> _dismissAlarm() async {
@@ -245,9 +259,14 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    // Restore normal system overlays
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    NotificationService.instance.dismissAlarmFlags();
+
     _clockTimer?.cancel();
     _vibrationTimer?.cancel();
     _pulseController.dispose();
+    _rippleController.dispose();
     _audioPlayer.stop();
     _audioPlayer.dispose();
     super.dispose();
@@ -298,35 +317,80 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
                         children: [
                           const SizedBox(height: 20),
 
-                  // Animated Bell Icon
-                  ScaleTransition(
-                    scale: _pulseAnimation,
-                    child: Container(
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.amber.withValues(alpha: 0.15),
-                        border: Border.all(
-                          color: Colors.amber.withValues(alpha: 0.3),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.amber.withValues(alpha: 0.2),
-                            blurRadius: 32,
-                            spreadRadius: 4,
+                  // Animated Pulsing Bell with Concentric Ripples
+                  AnimatedBuilder(
+                    animation: _rippleController,
+                    builder: (context, child) {
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Outer Ripple
+                          Transform.scale(
+                            scale: 1.0 + (_rippleController.value * 0.7),
+                            child: Container(
+                              width: 110,
+                              height: 110,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.amberAccent.withValues(
+                                    alpha: ((1.0 - _rippleController.value) * 0.45).clamp(0.0, 1.0),
+                                  ),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Middle Ripple
+                          Transform.scale(
+                            scale: 1.0 + (((_rippleController.value + 0.5) % 1.0) * 0.5),
+                            child: Container(
+                              width: 95,
+                              height: 95,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.amber.withValues(
+                                    alpha: ((1.0 - ((_rippleController.value + 0.5) % 1.0)) * 0.4).clamp(0.0, 1.0),
+                                  ),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Center Pulsing Bell
+                          ScaleTransition(
+                            scale: _pulseAnimation,
+                            child: Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.amber.withValues(alpha: 0.18),
+                                border: Border.all(
+                                  color: Colors.amber.withValues(alpha: 0.4),
+                                  width: 2.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.amber.withValues(alpha: 0.35),
+                                    blurRadius: 36,
+                                    spreadRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.notifications_active_rounded,
+                                size: 52,
+                                color: Colors.amberAccent,
+                              ),
+                            ),
                           ),
                         ],
-                      ),
-                      child: const Icon(
-                        Icons.notifications_active_rounded,
-                        size: 48,
-                        color: Colors.amberAccent,
-                      ),
-                    ),
+                      );
+                    },
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   // Digital Clock
                   Row(
@@ -337,20 +401,27 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
                       Text(
                         timeFormat.format(_currentTime),
                         style: const TextStyle(
-                          fontSize: 64,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 70,
+                          fontWeight: FontWeight.w900,
                           color: Colors.white,
                           letterSpacing: 2,
                           height: 1,
+                          shadows: [
+                            Shadow(
+                              color: Color(0x66F59E0B),
+                              blurRadius: 20,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         amPmFormat.format(_currentTime),
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: Colors.amberAccent.withValues(alpha: 0.9),
                         ),
                       ),
                     ],

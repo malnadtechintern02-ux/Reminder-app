@@ -2,6 +2,7 @@ package com.reminderapp.reminder_app
 
 import android.app.AlarmManager
 import android.app.KeyguardManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -16,10 +17,45 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.reminderapp.reminder_app/settings"
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var activeAlarmReminderId: String? = null
+    private var methodChannel: MethodChannel? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    private fun acquireWakeLock() {
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            if (powerManager != null) {
+                if (wakeLock?.isHeld == true) {
+                    wakeLock?.release()
+                }
+                @Suppress("DEPRECATION")
+                wakeLock = powerManager.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                    PowerManager.ON_AFTER_RELEASE,
+                    "TimeBell:AlarmWakeLock"
+                ).apply {
+                    setReferenceCounted(false)
+                    acquire(60 * 1000L) // Stay awake up to 60 seconds while alarm rings
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error acquiring wake lock", e)
+        }
+    }
 
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error releasing wake lock", e)
+        }
+    }
+
+    private fun wakeUpScreen() {
+        acquireWakeLock()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -30,16 +66,193 @@ class MainActivity : FlutterActivity() {
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
             )
         }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun clearKeepScreenOn() {
+        releaseWakeLock()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setTurnScreenOn(false)
+        }
+    }
+
+    private fun handleAlarmIntent(intent: Intent?) {
+        if (intent == null) return
+        val reminderId = intent.getStringExtra("reminder_id")
+        if (intent.action == "com.reminderapp.ALARM_TRIGGER" || reminderId != null) {
+            if (!reminderId.isNullOrEmpty()) {
+                activeAlarmReminderId = reminderId
+                wakeUpScreen()
+                runOnUiThread {
+                    methodChannel?.invokeMethod("onAlarmTriggered", reminderId)
+                }
+            }
+        }
+    }
+
+    private fun getAlarmRequestCode(uuid: String): Int {
+        var hash = 5381
+        for (i in 0 until uuid.length) {
+            hash = ((hash shl 5) + hash) + uuid[i].code
+            hash = hash and 0x03FFFFFF
+        }
+        return hash
+    }
+
+    private fun scheduleNativeAlarm(reminderId: String, triggerAtMillis: Long, title: String) {
+        try {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val requestCode = getAlarmRequestCode(reminderId)
+
+            val alarmIntent = Intent(applicationContext, MainActivity::class.java).apply {
+                action = "com.reminderapp.ALARM_TRIGGER"
+                putExtra("reminder_id", reminderId)
+                putExtra("alarm_title", title)
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
+            }
+
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                applicationContext,
+                requestCode,
+                alarmIntent,
+                flags
+            )
+
+            val showIntent = PendingIntent.getActivity(
+                applicationContext,
+                requestCode + 500000,
+                alarmIntent,
+                flags
+            )
+
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent)
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+            android.util.Log.d("MainActivity", "Native AlarmClock scheduled for $reminderId at $triggerAtMillis")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error scheduling native alarm", e)
+        }
+    }
+
+    private fun cancelNativeAlarm(reminderId: String) {
+        try {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val requestCode = getAlarmRequestCode(reminderId)
+            val alarmIntent = Intent(applicationContext, MainActivity::class.java).apply {
+                action = "com.reminderapp.ALARM_TRIGGER"
+            }
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                applicationContext,
+                requestCode,
+                alarmIntent,
+                flags
+            )
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
+            android.util.Log.d("MainActivity", "Native AlarmClock cancelled for $reminderId")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error cancelling native alarm", e)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        wakeUpScreen()
+        handleAlarmIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        wakeUpScreen()
+        handleAlarmIntent(intent)
+    }
+
+    override fun onDestroy() {
+        releaseWakeLock()
+        super.onDestroy()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        methodChannel = channel
+        channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "getInitialAlarmReminderId" -> {
+                    val id = activeAlarmReminderId
+                    activeAlarmReminderId = null
+                    result.success(id)
+                }
+                "scheduleNativeAlarm" -> {
+                    val reminderId = call.argument<String>("reminderId")
+                    val triggerAtMillis = (call.argument<Number>("triggerAtMillis"))?.toLong()
+                    val title = call.argument<String>("title") ?: "Alarm"
+                    if (reminderId != null && triggerAtMillis != null) {
+                        scheduleNativeAlarm(reminderId, triggerAtMillis, title)
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_ARGS", "Missing reminderId or triggerAtMillis", null)
+                    }
+                }
+                "cancelNativeAlarm" -> {
+                    val reminderId = call.argument<String>("reminderId")
+                    if (reminderId != null) {
+                        cancelNativeAlarm(reminderId)
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_ARGS", "Missing reminderId", null)
+                    }
+                }
+                "wakeUpScreen" -> {
+                    wakeUpScreen()
+                    result.success(true)
+                }
+                "clearKeepScreenOn" -> {
+                    clearKeepScreenOn()
+                    result.success(true)
+                }
+                "canUseFullScreenIntent" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                        result.success(nm?.canUseFullScreenIntent() ?: true)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "requestFullScreenIntentPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        try {
+                            val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                data = Uri.fromParts("package", packageName, null)
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
                 "canScheduleExactAlarms" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager

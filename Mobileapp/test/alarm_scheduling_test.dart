@@ -263,5 +263,26 @@ void main() {
         expect(maxSlot <= 0x7FFFFFFF, true, reason: 'Slot $maxSlot must fit in 32-bit positive integer');
       }
     });
+
+    test('One-off and Recurring alarm payloads extract ID properly', () {
+      const oneOffPayload = 'reminder_alarm:abc-123';
+      const recurringPayload = 'reminder_recurring:xyz-789';
+
+      String? extractAlarmId(String? payload) {
+        if (payload != null) {
+          if (payload.startsWith('reminder_alarm:')) {
+            return payload.substring('reminder_alarm:'.length);
+          } else if (payload.startsWith('reminder_recurring:')) {
+            return payload.substring('reminder_recurring:'.length);
+          }
+        }
+        return null;
+      }
+
+      expect(extractAlarmId(oneOffPayload), 'abc-123');
+      expect(extractAlarmId(recurringPayload), 'xyz-789');
+      expect(extractAlarmId('reminder_warning:warning-999'), isNull);
+    });
   });
 }
+

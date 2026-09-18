@@ -16,10 +16,11 @@ import '../../features/statistics/presentation/screens/statistics_page.dart';
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
 
-final GoRouter appRouter = GoRouter(
-  navigatorKey: _rootNavigatorKey,
-  initialLocation: RoutePaths.splash,
-  routes: [
+GoRouter createAppRouter({String initialLocation = RoutePaths.splash}) {
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: initialLocation,
+    routes: [
     GoRoute(
       path: RoutePaths.splash,
       name: RouteNames.splash,
@@ -119,3 +120,6 @@ final GoRouter appRouter = GoRouter(
     ),
   ],
 );
+}
+
+GoRouter appRouter = createAppRouter();
