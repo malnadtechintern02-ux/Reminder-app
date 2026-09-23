@@ -1,4 +1,4 @@
-package com.reminderapp.reminder_app
+package com.timebell.app
 
 import android.app.AlarmManager
 import android.app.KeyguardManager
@@ -16,7 +16,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.reminderapp.reminder_app/settings"
+    private val CHANNEL = "com.timebell.app/settings"
     private var wakeLock: PowerManager.WakeLock? = null
     private var activeAlarmReminderId: String? = null
     private var methodChannel: MethodChannel? = null
@@ -83,7 +83,7 @@ class MainActivity : FlutterActivity() {
     private fun handleAlarmIntent(intent: Intent?) {
         if (intent == null) return
         val reminderId = intent.getStringExtra("reminder_id")
-        if (intent.action == "com.reminderapp.ALARM_TRIGGER" || reminderId != null) {
+        if (intent.action == "com.timebell.app.ALARM_TRIGGER" || intent.action == "com.reminderapp.ALARM_TRIGGER" || reminderId != null) {
             if (!reminderId.isNullOrEmpty()) {
                 activeAlarmReminderId = reminderId
                 wakeUpScreen()
@@ -109,7 +109,7 @@ class MainActivity : FlutterActivity() {
             val requestCode = getAlarmRequestCode(reminderId)
 
             val alarmIntent = Intent(applicationContext, MainActivity::class.java).apply {
-                action = "com.reminderapp.ALARM_TRIGGER"
+                action = "com.timebell.app.ALARM_TRIGGER"
                 putExtra("reminder_id", reminderId)
                 putExtra("alarm_title", title)
                 addFlags(
@@ -152,7 +152,7 @@ class MainActivity : FlutterActivity() {
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
             val requestCode = getAlarmRequestCode(reminderId)
             val alarmIntent = Intent(applicationContext, MainActivity::class.java).apply {
-                action = "com.reminderapp.ALARM_TRIGGER"
+                action = "com.timebell.app.ALARM_TRIGGER"
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -440,4 +440,3 @@ class MainActivity : FlutterActivity() {
         }
     }
 }
-

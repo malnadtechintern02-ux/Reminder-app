@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:url_launcher/url_launcher.dart';
@@ -65,14 +66,6 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.access_time,
                 value: settings.use24HourFormat,
                 onChanged: (val) => ref.read(settingsNotifierProvider.notifier).setUse24HourFormat(val),
-              ),
-              _SettingsTile(
-                title: 'Share App',
-                subtitle: 'Invite friends & family to use Time Bell',
-                icon: Icons.share_rounded,
-                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-                onTap: () => _shareApp(context),
-                showDivider: false,
               ),
             ],
           ),
@@ -386,12 +379,14 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Future<void> _shareApp(BuildContext context) async {
-    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.reminderapp.reminder_app';
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.timebell.app';
     const shareMessage = 'Try Timebell – a simple reminder and alarm app.\n\n$playStoreUrl';
 
     try {
       final box = context.findRenderObject() as RenderBox?;
-      final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+      final origin = box != null && box.hasSize && box.size.width > 0 && box.size.height > 0
+          ? box.localToGlobal(Offset.zero) & box.size
+          : null;
 
       await SharePlus.instance.share(
         ShareParams(
@@ -403,10 +398,16 @@ class SettingsPage extends ConsumerWidget {
     } catch (e) {
       debugPrint('Error launching share sheet: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not open share dialog. Please try again.'),
-            duration: Duration(seconds: 2),
+        final messenger = ScaffoldMessenger.of(context);
+        await Clipboard.setData(const ClipboardData(text: playStoreUrl));
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text('Could not open share dialog. Link copied to clipboard!'),
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'OK',
+              onPressed: () {},
+            ),
           ),
         );
       }
@@ -540,7 +541,7 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Future<void> _openPlayStoreRating(BuildContext context) async {
-    const packageName = 'com.reminderapp.reminder_app';
+    const packageName = 'com.timebell.app';
     final marketUri = Uri.parse('market://details?id=$packageName');
     final webUri = Uri.parse('https://play.google.com/store/apps/details?id=$packageName');
 

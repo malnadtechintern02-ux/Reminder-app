@@ -28,7 +28,7 @@ class NotificationService {
   final fln.FlutterLocalNotificationsPlugin _localNotifications = fln.FlutterLocalNotificationsPlugin();
 
   static const MethodChannel _settingsChannel =
-      MethodChannel('com.reminderapp.reminder_app/settings');
+      MethodChannel('com.timebell.app/settings');
 
   /// Callback triggered when an alarm notification or full-screen intent is opened
   static void Function(String reminderId)? onAlarmTriggered;

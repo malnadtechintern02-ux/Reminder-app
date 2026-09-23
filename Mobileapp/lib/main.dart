@@ -4,10 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app.dart';
 import 'app/theme/theme_provider.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/firebase_service.dart';
 import 'app/router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase (Analytics, Crashlytics, FCM)
+  await FirebaseService.instance.init();
 
   // Initialize SharedPreferences
   final prefs = await SharedPreferences.getInstance();

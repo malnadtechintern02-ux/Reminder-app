@@ -259,7 +259,7 @@ class _RingtoneSelectionScreenState extends ConsumerState<RingtoneSelectionScree
       
       // Pre-warm MediaStore entry so Android system services can access and play it as an alarm immediately
       try {
-        const settingsChannel = MethodChannel('com.reminderapp.reminder_app/settings');
+        const settingsChannel = MethodChannel('com.timebell.app/settings');
         await settingsChannel.invokeMethod<String>('getMediaUriForFile', {'path': targetPath});
       } catch (e) {
         debugPrint('Pre-warming MediaStore URI error: $e');

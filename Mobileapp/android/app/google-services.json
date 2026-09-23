@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "475470078884",
+    "project_id": "time-bell-app",
+    "storage_bucket": "time-bell-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:475470078884:android:eeb6b0fd2e87e80f679731",
+        "android_client_info": {
+          "package_name": "com.timebell.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4Y787zG--w3iXI_faLNpycBTpaM3ZQZ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
